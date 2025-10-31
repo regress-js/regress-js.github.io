@@ -1,0 +1,39 @@
+body {
+    font-family: sans-serif;
+}
+
+main {
+    margin: auto;
+    width: fit-content;
+    display: flex;
+}
+
+#data-table {
+    background-color: gray;
+    border-collapse: collapse;
+    th, td {
+        border: 1px solid black;
+    }
+    td {
+        min-width: 3rem;
+        text-align: center;
+        height: 1rem;
+    }
+    .data-row {
+        .data-cell-nan {
+            color: red;
+        }
+    }
+}
+
+#chart {
+    border: 1px solid gray;
+    width: 560px;
+    height: 346px;
+}
+
+#stats {
+    math {
+        display: block;
+    }
+}
