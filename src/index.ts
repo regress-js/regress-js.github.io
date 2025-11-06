@@ -1,9 +1,12 @@
+import * as e from 'express';
 import './app.css'; // referencing .css file
 
 interface Data {
     variables: string[],
     values: string[][],
     uncertainties: string[][],
+    show_uncertainties: boolean[],
+    use_uncertainties: boolean[],
 }
 
 interface RegressionResult {
@@ -21,6 +24,8 @@ let data: Data = {
     variables: ["X", "Y"],
     values: [["0", "14.79"], ["2", "33.52"], ["4", "36.50"], ["6", "51.88"], ["8", "63.11"], ["10", "66.94"], ["12", "74.58"], ["14", "92.46"], ["16", "89.50"], ["18", "109.29"], ["20", "117.40"], ["22", "118.37"]],
     uncertainties: [["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"]],
+    show_uncertainties: [true, true],
+    use_uncertainties: [false, true],
 }
 
 
@@ -181,6 +186,9 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
 
 function redraw(): void {
 
+    const modal = document.getElementById("modal");
+    modal.onclick = (e) => { if (e.target == modal) modal.classList.remove("modal-visible"); };
+
     const table = document.getElementById('data-table');
 
     const row = <HTMLTableRowElement> getOrCreateElementWithId('tr', 'header-row', table);
@@ -192,8 +200,27 @@ function redraw(): void {
         });
         addCellToRow('u(' + data.variables[j] + ')', i, j, 'uncertainty', row, () => {});
 
-        const cell = <HTMLTableCellElement> getOrCreateElementWithId('td', tableCellId(i, j, 'settings'), settingsRow);
-        cell.colSpan = 2;
+        const settingsCell = <HTMLTableCellElement> getOrCreateElementWithId('td', tableCellId(i, j, 'settings'), settingsRow);
+        settingsCell.colSpan = 2;
+        settingsCell.onclick = () => {
+            const modalTitle = document.getElementById("modal-title");
+            modalTitle.textContent = "Paramètres de " + data.variables[j];
+            const modalContent = document.getElementById("modal-content");
+            modalContent.innerHTML = `
+            <fieldset>
+                <legend>Incertitudes</legend>
+                <input type="checkbox" id="uncertainty-` + j + `-display" ` + (data.show_uncertainties[j] ? `checked` : ``) + `/><label for="uncertainty-` + j + `-display">Afficher</label>
+                <input type="checkbox" id="uncertainty-` + j + `-use" ` + (data.use_uncertainties[j] ? `checked` : ``) + `/><label for="uncertainty-` + j + `-use">Utiliser</label>
+            </fieldset>
+            `;
+            document.getElementById("modal").classList.add("modal-visible");
+            document.getElementById("uncertainty-" + j + "-display").onclick = () => {
+                data.show_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-display")).checked;
+            }
+            document.getElementById("uncertainty-" + j + "-use").onclick = () => {
+                data.use_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-use")).checked;
+            }
+        }
     }
 
     for (let i = 0; i < data.values.length; i++) {
@@ -228,7 +255,7 @@ function redraw(): void {
         });
     }
 
-    let valid_data: Data = {variables: [], values: [], uncertainties: []};
+    let valid_data: Data = {variables: [], values: [], uncertainties: [], show_uncertainties: [], use_uncertainties: []};
     valid_data.variables.push(...data.variables);
     for (let i = 0; i < data.values.length; i++) {
         const xy = data.values[i];
