@@ -138,7 +138,8 @@ function keep_digits(n: number, x: number, other?: number) {
 function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     /* Modèle y = a + b*x (https://bupdoc.udppc.asso.fr/consultation/article-bup.php?ID_fiche=20802) */
     // Décider si les incertitudes sont rensignées, si non, prendre 1.
-    const u = uy.filter(it => it != 0).length > 0 ? uy : Array(uy.length).fill(1);
+    const use_u = uy.filter(it => it != 0).length > 0;
+    const u = use_u ? uy : Array(uy.length).fill(1);
     // Calculer les moyennes des x et des y (pour le r)
     const xm = x.reduce((xx, p) => Number(xx) + p, 0) / x.length;
     const ym = y.reduce((yy, p) => Number(yy) + p, 0) / x.length;
@@ -161,8 +162,14 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     const Delta = S11 * Sx2 - Math.pow(Sx1, 2);
     const a = (Sx2 * Sy1 - Sx1 * Sxy) / Delta;
     const b = (S11 * Sxy - Sx1 * Sy1) / Delta;
-    const sigma_b = Math.sqrt(S11 / Delta);
-    const sigma_a = Math.sqrt(Sx2 / Delta);
+    // sigma stat
+    let SDmod = 0;
+    for (let i = 0; i < x.length; i++) {
+        SDmod += Math.pow(y[i] - (a + b * x[i]), 2);
+    }
+    const sigma_stat = Math.sqrt(SDmod / (x.length - 2));
+    const sigma_b = Math.sqrt(S11 / Delta) * (use_u ? 1 : sigma_stat);
+    const sigma_a = Math.sqrt(Sx2 / Delta) * (use_u ? 1 : sigma_stat);
     // r
     const r = SDxy / Math.sqrt(SDx2 * SDy2);
     // chi 2
@@ -171,12 +178,6 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
         chi2 += Math.pow((b*x[i]+a - y[i]) / u[i], 2)
     }
     const chi2red = chi2 / (x.length - 2);
-    // sigma stat
-    let SDmod = 0;
-    for (let i = 0; i < x.length; i++) {
-        SDmod += Math.pow(y[i] - (a + b * x[i]), 2);
-    }
-    const sigma_stat = Math.sqrt(SDmod / (x.length - 2));
 
     return {
         b: b, a: a, sigma_b: sigma_b, sigma_a: sigma_a, sigma_stat: sigma_stat, r: r, chi2: chi2, chi2red: chi2red,
@@ -216,9 +217,11 @@ function redraw(): void {
             document.getElementById("modal").classList.add("modal-visible");
             document.getElementById("uncertainty-" + j + "-display").onclick = () => {
                 data.show_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-display")).checked;
+                redraw();
             }
             document.getElementById("uncertainty-" + j + "-use").onclick = () => {
                 data.use_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-use")).checked;
+                redraw();
             }
         }
     }
@@ -259,7 +262,7 @@ function redraw(): void {
     valid_data.variables.push(...data.variables);
     for (let i = 0; i < data.values.length; i++) {
         const xy = data.values[i];
-        const uxy = data.uncertainties[i];
+        const uxy = data.uncertainties.map((u, j) => data.use_uncertainties[j] ? u[j] : "0");
         let isBad = false;
         for (let j = 0; j < data.variables.length; j++) {
             const vIsBad = (xy[j] == undefined) || (xy[j].length == 0) || Number.isFinite(xy[j]);
