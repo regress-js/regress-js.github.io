@@ -213,17 +213,19 @@ function redraw(): void {
     for (let j = 0; j < data.variables.length; j++) {
         const i = data.values.length;
         addCellToRow('', i, j, 'variable', lastRow, (e, s) => {
+            if (!s) return;
             if (!data.values[i])
-                data.values.push(Array(data.variables.length));
+                data.values.push(Array(data.variables.length).fill(""));
             if (!data.uncertainties[i])
-                data.uncertainties.push(Array(data.variables.length));
+                data.uncertainties.push(Array(data.variables.length).fill(""));
             data.values[i][j] = s;
         });
         addCellToRow('', i, j, 'uncertainty', lastRow, (e, s) => {
+            if (!s) return;
             if (!data.values[i])
-                data.values.push(Array(data.variables.length));
+                data.values.push(Array(data.variables.length).fill(""));
             if (!data.uncertainties[i])
-                data.uncertainties.push(Array(data.variables.length));
+                data.uncertainties.push(Array(data.variables.length).fill(""));
             data.uncertainties[i][j] = s;
         });
     }
@@ -235,8 +237,9 @@ function redraw(): void {
         const uxy = data.uncertainties[i];
         let isBad = false;
         for (let j = 0; j < data.variables.length; j++) {
-            const vIsBad = (xy[j] == undefined) || (xy[j].length == 0) || Number.isFinite(xy[j]);
-            const uIsBad = (uxy[j] == undefined) || (uxy[j].length == 0) || Number.isFinite(uxy[j]);
+            console.log(xy[j], !Number.isFinite(Number.parseFloat(xy[j])));
+            const vIsBad = (xy[j] == undefined) || (xy[j].length == 0) || !Number.isFinite(Number.parseFloat(xy[j]));
+            const uIsBad = (uxy[j] == undefined) || (uxy[j].length == 0) || !Number.isFinite(Number.parseFloat(uxy[j]));
             const vCell = document.getElementById("data-row-" + i + "-variable-" + j);
             const uCell = document.getElementById("data-row-" + i + "-uncertainty-" + j);
             if (vIsBad || uIsBad) {
