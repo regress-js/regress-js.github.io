@@ -1,9 +1,12 @@
+import * as e from 'express';
 import './app.css'; // referencing .css file
 
 interface Data {
     variables: string[],
     values: string[][],
     uncertainties: string[][],
+    show_uncertainties: boolean[],
+    use_uncertainties: boolean[],
 }
 
 interface RegressionResult {
@@ -21,6 +24,8 @@ let data: Data = {
     variables: ["X", "Y"],
     values: [["0", "14.79"], ["2", "33.52"], ["4", "36.50"], ["6", "51.88"], ["8", "63.11"], ["10", "66.94"], ["12", "74.58"], ["14", "92.46"], ["16", "89.50"], ["18", "109.29"], ["20", "117.40"], ["22", "118.37"]],
     uncertainties: [["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"]],
+    show_uncertainties: [true, true],
+    use_uncertainties: [false, true],
 }
 
 
@@ -133,7 +138,8 @@ function keep_digits(n: number, x: number, other?: number) {
 function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     /* Modèle y = a + b*x (https://bupdoc.udppc.asso.fr/consultation/article-bup.php?ID_fiche=20802) */
     // Décider si les incertitudes sont rensignées, si non, prendre 1.
-    const u = uy.filter(it => it != 0).length > 0 ? uy : Array(uy.length).fill(1);
+    const use_u = uy.filter(it => it != 0).length > 0;
+    const u = use_u ? uy : Array(uy.length).fill(1);
     // Calculer les moyennes des x et des y (pour le r)
     const xm = x.reduce((xx, p) => Number(xx) + p, 0) / x.length;
     const ym = y.reduce((yy, p) => Number(yy) + p, 0) / x.length;
@@ -156,8 +162,14 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     const Delta = S11 * Sx2 - Math.pow(Sx1, 2);
     const a = (Sx2 * Sy1 - Sx1 * Sxy) / Delta;
     const b = (S11 * Sxy - Sx1 * Sy1) / Delta;
-    const sigma_b = Math.sqrt(S11 / Delta);
-    const sigma_a = Math.sqrt(Sx2 / Delta);
+    // sigma stat
+    let SDmod = 0;
+    for (let i = 0; i < x.length; i++) {
+        SDmod += Math.pow(y[i] - (a + b * x[i]), 2);
+    }
+    const sigma_stat = Math.sqrt(SDmod / (x.length - 2));
+    const sigma_b = Math.sqrt(S11 / Delta) * (use_u ? 1 : sigma_stat);
+    const sigma_a = Math.sqrt(Sx2 / Delta) * (use_u ? 1 : sigma_stat);
     // r
     const r = SDxy / Math.sqrt(SDx2 * SDy2);
     // chi 2
@@ -166,12 +178,6 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
         chi2 += Math.pow((b*x[i]+a - y[i]) / u[i], 2)
     }
     const chi2red = chi2 / (x.length - 2);
-    // sigma stat
-    let SDmod = 0;
-    for (let i = 0; i < x.length; i++) {
-        SDmod += Math.pow(y[i] - (a + b * x[i]), 2);
-    }
-    const sigma_stat = Math.sqrt(SDmod / (x.length - 2));
 
     return {
         b: b, a: a, sigma_b: sigma_b, sigma_a: sigma_a, sigma_stat: sigma_stat, r: r, chi2: chi2, chi2red: chi2red,
@@ -180,6 +186,9 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
 
 
 function redraw(): void {
+
+    const modal = document.getElementById("modal");
+    modal.onclick = (e) => { if (e.target == modal) modal.classList.remove("modal-visible"); };
 
     const table = document.getElementById('data-table');
 
@@ -192,8 +201,29 @@ function redraw(): void {
         });
         addCellToRow('u(' + data.variables[j] + ')', i, j, 'uncertainty', row, () => {});
 
-        const cell = <HTMLTableCellElement> getOrCreateElementWithId('td', tableCellId(i, j, 'settings'), settingsRow);
-        cell.colSpan = 2;
+        const settingsCell = <HTMLTableCellElement> getOrCreateElementWithId('td', tableCellId(i, j, 'settings'), settingsRow);
+        settingsCell.colSpan = 2;
+        settingsCell.onclick = () => {
+            const modalTitle = document.getElementById("modal-title");
+            modalTitle.textContent = "Paramètres de " + data.variables[j];
+            const modalContent = document.getElementById("modal-content");
+            modalContent.innerHTML = `
+            <fieldset>
+                <legend>Incertitudes</legend>
+                <input type="checkbox" id="uncertainty-` + j + `-display" ` + (data.show_uncertainties[j] ? `checked` : ``) + `/><label for="uncertainty-` + j + `-display">Afficher</label>
+                <input type="checkbox" id="uncertainty-` + j + `-use" ` + (data.use_uncertainties[j] ? `checked` : ``) + `/><label for="uncertainty-` + j + `-use">Utiliser</label>
+            </fieldset>
+            `;
+            document.getElementById("modal").classList.add("modal-visible");
+            document.getElementById("uncertainty-" + j + "-display").onclick = () => {
+                data.show_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-display")).checked;
+                redraw();
+            }
+            document.getElementById("uncertainty-" + j + "-use").onclick = () => {
+                data.use_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-use")).checked;
+                redraw();
+            }
+        }
     }
 
     for (let i = 0; i < data.values.length; i++) {
@@ -230,11 +260,11 @@ function redraw(): void {
         });
     }
 
-    let valid_data: Data = {variables: [], values: [], uncertainties: []};
+    let valid_data: Data = {variables: [], values: [], uncertainties: [], show_uncertainties: [], use_uncertainties: []};
     valid_data.variables.push(...data.variables);
     for (let i = 0; i < data.values.length; i++) {
         const xy = data.values[i];
-        const uxy = data.uncertainties[i];
+        const uxy = data.uncertainties.map((u, j) => data.use_uncertainties[j] ? u[j] : "0");
         let isBad = false;
         for (let j = 0; j < data.variables.length; j++) {
             console.log(xy[j], !Number.isFinite(Number.parseFloat(xy[j])));
