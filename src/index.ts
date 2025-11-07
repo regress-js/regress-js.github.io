@@ -264,7 +264,7 @@ function redraw(): void {
     valid_data.variables.push(...data.variables);
     for (let i = 0; i < data.values.length; i++) {
         const xy = data.values[i];
-        const uxy = data.uncertainties[i];
+        const uxy = data.uncertainties.map((u, j) => data.use_uncertainties[j] ? u[j] : "0");
         let isBad = false;
         for (let j = 0; j < data.variables.length; j++) {
             const vIsBad = (xy[j] == undefined) || (xy[j].length == 0) || !Number.isFinite(Number(xy[j]));
