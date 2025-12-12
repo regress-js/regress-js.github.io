@@ -50,6 +50,8 @@ function tableCellId(row: number, col: number, specifier: string) {
 }
 
 let cellIdToFocus: string = "";
+let inputHappendInFocusedCell: boolean = false;
+let storedFocusesCellValue: string = "";
 function focusTableCell(row: number, col: number, specifier: string) {
     cellIdToFocus = tableCellId(row, col, specifier)
     const target = document.getElementById(cellIdToFocus);
@@ -90,21 +92,48 @@ function addCellToRow(textContent: string, i: number, j: number, specifier: stri
             focusTableCell(i, j+1, 'variable');
         }
     }
+    cell.onfocus = (e) => {
+        inputHappendInFocusedCell = false;
+        storedFocusesCellValue = cell.innerText;
+        var sel, range;
+        window.setTimeout(function() {
+        if (window.getSelection && document.createRange) {
+            range = document.createRange();
+            range.selectNodeContents(cell);
+            sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } else if ((<any> document.body).createTextRange) {
+            range = (<any> document.body).createTextRange();
+            range.moveToElementText(cell);
+            range.select();
+        }}, 1);
+    }
     cell.onkeyup = (e) => { e.stopPropagation(); }
     cell.onkeydown = (e: KeyboardEvent) => {
         if (e.key === 'Enter') {
             e.stopPropagation();
+            if (!inputHappendInFocusedCell)
+                cell.innerText = storedFocusesCellValue;
             moveDown();
+            return;
         }
         if (e.key === 'ArrowDown') {
             e.stopPropagation();
+            if (!inputHappendInFocusedCell)
+                cell.innerText = storedFocusesCellValue;
             moveDown();
+            return;
         }
-        else if (e.key === 'ArrowUp') {
+        if (e.key === 'ArrowUp') {
             e.stopPropagation();
+            if (!inputHappendInFocusedCell)
+                cell.innerText = storedFocusesCellValue;
             moveUp();
+            return;
         }
-        else if (e.key === 'ArrowRight') {
+        inputHappendInFocusedCell = true;
+        if (e.key === 'ArrowRight') {
             let _range = document.getSelection().getRangeAt(0)
             let range = _range.cloneRange()
             range.selectNodeContents(cell)
@@ -113,8 +142,9 @@ function addCellToRow(textContent: string, i: number, j: number, specifier: stri
             if (carretPosition == cell.textContent.length) {
                 moveRight();
             }
+            return;
         }
-        else if (e.key === 'ArrowLeft') {
+        if (e.key === 'ArrowLeft') {
             let _range = document.getSelection().getRangeAt(0)
             let range = _range.cloneRange()
             range.selectNodeContents(cell)
@@ -123,6 +153,7 @@ function addCellToRow(textContent: string, i: number, j: number, specifier: stri
             if (carretPosition == 0) {
                 moveLeft();
             }
+            return;
         }
     }
 }
