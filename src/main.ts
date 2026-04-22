@@ -1,10 +1,8 @@
-import * as e from 'express';
-import './app.css'; // referencing .css file
-
 interface Data {
     variables: string[],
     values: string[][],
     uncertainties: string[][],
+    uncertainty_forumlas: string[],
     show_uncertainties: boolean[],
     use_uncertainties: boolean[],
 }
@@ -24,6 +22,7 @@ let data: Data = {
     variables: ["X", "Y"],
     values: [["0", "14.79"], ["2", "33.52"], ["4", "36.50"], ["6", "51.88"], ["8", "63.11"], ["10", "66.94"], ["12", "74.58"], ["14", "92.46"], ["16", "89.50"], ["18", "109.29"], ["20", "117.40"], ["22", "118.37"]],
     uncertainties: [["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"]],
+    uncertainty_forumlas: ["", ""],
     show_uncertainties: [true, true],
     use_uncertainties: [false, true],
 }
@@ -159,6 +158,11 @@ function addCellToRow(textContent: string, i: number, j: number, specifier: stri
 }
 
 function keep_digits(n: number, x: number, other?: number) {
+    if (x == 0)
+        if (other)
+            return other.toString();
+        else
+            return (0).toString();
     const decimal_shift = Math.ceil(-Math.log10(Math.abs(x)));
     const power = Math.pow(10, decimal_shift + n - 1);
     if (other)
@@ -171,12 +175,9 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     // Décider si les incertitudes sont rensignées, si non, prendre 1.
     const use_u = uy.filter(it => it != 0).length > 0;
     const u = use_u ? uy : Array(uy.length).fill(1);
-    // Calculer les moyennes des x et des y (pour le r)
-    const xm = x.reduce((xx, p) => Number(xx) + p, 0) / x.length;
-    const ym = y.reduce((yy, p) => Number(yy) + p, 0) / x.length;
     // Calculer les sommes permettant d'évaluer...
     let S11 = 0, Sx2 = 0, Sy2 = 0, Sxy = 0, Sx1 = 0, Sy1 = 0;  // ... a, b, ua, ub
-    let SDxy = 0, SDx2 = 0, SDy2 = 0;  // ... r
+    let xacc = 0, yacc = 0, SDxy = 0, SDx2 = 0, SDy2 = 0;  // ... r
     for (let i = 0; i < x.length; i++) {
         const w = u[i] == 0 ? Number.MIN_VALUE : 1 / Math.pow(u[i], 2);
         S11 += w;
@@ -185,9 +186,8 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
         Sxy += w * x[i] * y[i];
         Sx2 += w * Math.pow(x[i], 2);
         Sy2 += w * Math.pow(y[i], 2);
-        SDxy += (x[i] - xm) * (y[i] - ym);
-        SDx2 += Math.pow(x[i] - xm, 2);
-        SDy2 += Math.pow(y[i] - ym, 2);
+        xacc += w * x[i];
+        yacc += w * y[i];
     }
     // a et b
     const Delta = S11 * Sx2 - Math.pow(Sx1, 2);
@@ -202,6 +202,12 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     const sigma_b = Math.sqrt(S11 / Delta) * (use_u ? 1 : sigma_stat);
     const sigma_a = Math.sqrt(Sx2 / Delta) * (use_u ? 1 : sigma_stat);
     // r
+    for (let i = 0; i < x.length; i++) {
+        const w = u[i] == 0 ? Number.MIN_VALUE : 1 / Math.pow(u[i], 2);
+        SDxy += w * (x[i] - xacc/S11) * (y[i] - yacc/S11) / S11;
+        SDx2 += w * Math.pow(x[i] - xacc/S11, 2) / S11;
+        SDy2 += w * Math.pow(y[i] - yacc/S11, 2) / S11;
+    }
     const r = SDxy / Math.sqrt(SDx2 * SDy2);
     // chi 2
     let chi2 = 0;
@@ -243,6 +249,8 @@ function redraw(): void {
                 <legend>Incertitudes</legend>
                 <input type="checkbox" id="uncertainty-` + j + `-display" ` + (data.show_uncertainties[j] ? `checked` : ``) + `/><label for="uncertainty-` + j + `-display">Afficher</label>
                 <input type="checkbox" id="uncertainty-` + j + `-use" ` + (data.use_uncertainties[j] ? `checked` : ``) + `/><label for="uncertainty-` + j + `-use">Utiliser</label>
+                <br>
+                <label for="uncertainty-`+ j + `-formula">Expression :</label><input type="text" id="uncertainty-`+ j + `-formula" value="` + data.uncertainty_forumlas[j] + `"/>
             </fieldset>
             `;
             document.getElementById("modal").classList.add("modal-visible");
@@ -252,6 +260,10 @@ function redraw(): void {
             }
             document.getElementById("uncertainty-" + j + "-use").onclick = () => {
                 data.use_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-use")).checked;
+                redraw();
+            }
+            document.getElementById("uncertainty-" + j + "-formula").onblur = () => {
+                data.uncertainty_forumlas[j] = (<HTMLInputElement> document.getElementById("uncertainty-" + j + "-formula")).value.trim();
                 redraw();
             }
         }
@@ -264,9 +276,14 @@ function redraw(): void {
             addCellToRow(data.values[i][j], i, j, 'variable', row, (e, s) => {
                 data.values[i][j] = s;
             });
-            addCellToRow(data.uncertainties[i][j], i, j, 'uncertainty', row, (e, s) => {
-                data.uncertainties[i][j] = s;
-            });
+            if (data.uncertainty_forumlas[j].length == 0)
+                addCellToRow(data.uncertainties[i][j], i, j, 'uncertainty', row, (e, s) => {
+                    data.uncertainties[i][j] = s;
+                });
+            else
+                addCellToRow("=" + math.evaluate(data.uncertainty_forumlas[j].replace(data.variables[j], data.values[i][j])).toFixed(3), i, j, 'uncertainty', row, (e, s) => {
+                    data.uncertainties[i][j] = s;
+                });
         }
     }
 
@@ -291,11 +308,19 @@ function redraw(): void {
         });
     }
 
-    let valid_data: Data = {variables: [], values: [], uncertainties: [], show_uncertainties: [], use_uncertainties: []};
+    let valid_data: Data = {variables: [], values: [], uncertainties: [], uncertainty_forumlas: [], show_uncertainties: [], use_uncertainties: []};
     valid_data.variables.push(...data.variables);
     for (let i = 0; i < data.values.length; i++) {
         const xy = data.values[i];
-        const uxy = data.uncertainties.map((u, j) => data.use_uncertainties[j] ? u[j] : "0");
+        const uxy = [];
+        for (let j = 0; j < data.variables.length; j++) {
+            if (!data.use_uncertainties[j])
+                uxy.push("0");
+            else if (data.uncertainty_forumlas[j].length == 0)
+                uxy.push(data.uncertainties[i][j]);
+            else
+                uxy.push(math.evaluate(data.uncertainty_forumlas[j].replace(data.variables[j], xy[j])).toString());
+        }
         let isBad = false;
         for (let j = 0; j < data.variables.length; j++) {
             const vIsBad = (xy[j] == undefined) || (xy[j].length == 0) || !Number.isFinite(Number(xy[j]));
@@ -316,6 +341,7 @@ function redraw(): void {
             valid_data.uncertainties.push(uxy);
         }
     }
+    console.log(valid_data.uncertainties)
 
     const regres = regress(
         valid_data.values.map(xy => Number(xy[0])),
