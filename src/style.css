@@ -4,63 +4,59 @@ body {
 
 main {
     margin: auto;
-    width: fit-content;
+    width: 100%;
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    column-gap: 1em;
+    row-gap: 2em;
 }
 
-#data-table {
-    background-color: gray;
+.half {
+    max-width: 50%;
+    display: flex;
+    flex-wrap: wrap;
+    flex-grow: 1;
+    align-content: flex-start;
+    row-gap: 1em;
+    column-gap: 1em;
+}
+
+.full {
+    width: 100%;
+}
+
+#input-table-field {
+    width: 100%;
+}
+
+#input-table, #computed-table {
+    flex-grow: 1;
     border-collapse: collapse;
+    th {
+        font-weight: bold;
+    }
     th, td {
-        border: 1px solid black;
+        text-align: right;
+        border: 1px solid lightgray;
+        min-width: 5em;
+        height: 1.2em;
+        padding: 0.5em;
     }
-    td {
-        min-width: 3rem;
-        text-align: center;
-        height: 1rem;
+    .input-value-invalid {
+        box-shadow: inset 0 0 0 2px lightcoral;
     }
-    .data-row {
-        .data-cell-nan {
-            color: red;
-        }
+    .selected {
+        box-shadow: inset 0 0 0 2px lightskyblue;
     }
 }
 
 #chart {
-    border: 1px solid gray;
-    width: 560px;
-    height: 346px;
+    flex-grow: 1;
 }
 
 #stats {
     math {
         display: block;
     }
-}
-
-#modal {
-    position: fixed;
-    display: none;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-    z-index: 100;
-    background-color: color-mix(in srgb, white, transparent 20%);
-}
-
-#modal-box {
-    position: fixed;
-    top: 10%;
-    width: 25%;
-    height: 25%;
-    text-align: center;
-    align-content: center;
-    background-color: color-mix(in srgb, white, transparent 5%);
-    border: 1px solid black;
-}
-
-.modal-visible {
-    display: flex !important;
 }

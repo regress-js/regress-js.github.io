@@ -6,20 +6,34 @@
 </head>
 <body id="body">
     <main>
-        <table id="data-table"></table>
-        <div id="chart">
-            <svg version="1.1" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            </svg>
+        <div class="half">
+            <div class="full">
+                <input id="input-table-field">
+            </div>
+            <table id="input-table"></table>
+            <table id="computed-table"></table>
         </div>
-        <div id="stats">
-            <math><mrow><mi class="eqn-ordinate">y</mi><mo>=</mo><mi class="eqn-slope">a</mi><mo>+</mo><mi class="eqn-intercept">b</mi><mo>&InvisibleTimes;</mo><mi class="eqn-abscisse">x</mi></mrow></math>
-            <math><mrow><mi class="eqn-intercept">a</mi><mo>=</mo><mi class="eqn-intercept-value">?</mi><mo>±</mo><mi class="eqn-intercept-uncertainty">?</mi></mrow></math>
-            <math><mrow><mi class="eqn-slope">b</mi><mo>=</mo><mi class="eqn-slope-value">?</mi><mo>±</mo><mi class="eqn-slope-uncertainty">?</mi></mrow></math>
-            <math><mrow><mi class="eqn-r">R</mi><mo>=</mo><mi class="eqn-r-value">?</mi></mrow></math>
-            <math><mrow><msup><mi class="eqn-r2">R</mi><mn>2</mn></msup><mo>=</mo><mi class="eqn-r2-value">?</mi></mrow></math>
-            <math><mrow><msub><mi class="eqn-sigmastat">σ</mi><mn>stat</mn></msub><mo>=</mo><mi class="eqn-sigmastat-value">?</mi></mrow></math>
-            <math><mrow><msup><mi class="eqn-chi2">χ</mi><mn>2</mn></msup><mo>=</mo><mi class="eqn-chi2-value">?</mi></mrow></math>
-            <math><mrow><msubsup><mi class="eqn-chi2red">χ</mi><mn>réduit</mn><mn>2</mn></msubsup><mo>=</mo><mi class="eqn-chi2red-value">?</mi></mrow></math>
+        <div class="half">
+            <div class="full">
+                Abscisse: <select id="abscisse-select"></select>
+                Incertitude abscisse: <select id="u-abscisse-select"></select>
+                Ordonnée: <select id="ordinate-select"></select>
+                Incertitude ordonnée: <select id="u-ordinate-select"></select>
+            </div>
+            <div id="chart">
+                <svg version="1.1" width="100%" xmlns="http://www.w3.org/2000/svg">
+                </svg>
+            </div>
+            <div id="stats">
+                <math><mrow><mi class="eqn-ordinate">y</mi><mo>=</mo><mi class="eqn-slope">a</mi><mo>+</mo><mi class="eqn-intercept">b</mi><mo>&InvisibleTimes;</mo><mi class="eqn-abscisse">x</mi></mrow></math>
+                <math><mrow><mi class="eqn-intercept">a</mi><mo>=</mo><mi class="eqn-intercept-value">?</mi><mo>±</mo><mi class="eqn-intercept-uncertainty">?</mi></mrow></math>
+                <math><mrow><mi class="eqn-slope">b</mi><mo>=</mo><mi class="eqn-slope-value">?</mi><mo>±</mo><mi class="eqn-slope-uncertainty">?</mi></mrow></math>
+                <math><mrow><mi class="eqn-r">R</mi><mo>=</mo><mi class="eqn-r-value">?</mi></mrow></math>
+                <math><mrow><msup><mi class="eqn-r2">R</mi><mn>2</mn></msup><mo>=</mo><mi class="eqn-r2-value">?</mi></mrow></math>
+                <math><mrow><msub><mi class="eqn-sigmastat">σ</mi><mn>stat</mn></msub><mo>=</mo><mi class="eqn-sigmastat-value">?</mi></mrow></math>
+                <math><mrow><msup><mi class="eqn-chi2">χ</mi><mn>2</mn></msup><mo>=</mo><mi class="eqn-chi2-value">?</mi></mrow></math>
+                <math><mrow><msubsup><mi class="eqn-chi2red">χ</mi><mn>réduit</mn><mn>2</mn></msubsup><mo>=</mo><mi class="eqn-chi2red-value">?</mi></mrow></math>
+            </div>
         </div>
     </main>
     <section id="about">
@@ -28,10 +42,10 @@
             Les paramètres de la régression linéaire, ainsi que plusieurs indicateurs statistiques, sont fournis.
         </p>
         <p>
-            Les incertitudes associées aux paramètres de la régression linéaire sont également fournies ; elles dépendent des incertitudes sur les valeurs d'ordonnée u(Y) rensignées dans le tableau.
+            Les incertitudes associées aux paramètres de la régression linéaire sont également fournies ; elles dépendent des incertitudes sur les valeurs d'ordonnée (pas celles sur les abscisses !).
         </p>
         <p>
-            Les incertitudes peuvent être entrées manuellement ligne par ligne, ou par une expression mathématique en cliquant sur l'en-tête des colonnes Y du tableau. Dans l'expression mathématique, on peut utiliser le nom de la variable (Y par défaut) pour calculer l'incertitude.
+            Les valeurs peuvent être entrées manuellement ligne par ligne dans le tableau de gauche, ou par une expression mathématique en cliquant sur l'en-tête des colonnes du tableau de droite. Dans l'expression mathématique, on peut utiliser le nom des autres variable (X ou Y par défaut).
         </p>
         <p>
             Tous les calculs sont effectués en suivant scrupuleusement les indications de :

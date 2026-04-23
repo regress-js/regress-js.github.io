@@ -1,3 +1,6 @@
+import Mexp from "math-expression-evaluator";
+const mexp = new Mexp();
+
 interface Data {
     variables: string[],
     values: string[][],
@@ -35,127 +38,6 @@ function setClassContentTo(cls: string, value: string): void {
     }
 }
 
-function getOrCreateElementWithId(tagName: string, id: string, parent: HTMLElement): HTMLElement {
-  let result = document.getElementById(id);
-  if (result != undefined) return result;
-  result = document.createElement(tagName);
-  result.id = id;
-  parent.appendChild(result);
-  return result;
-}
-
-function tableCellId(row: number, col: number, specifier: string) {
-    return 'data-row-' + row + '-' + specifier + '-' + col;
-}
-
-let cellIdToFocus: string = "";
-let inputHappendInFocusedCell: boolean = false;
-let storedFocusesCellValue: string = "";
-function focusTableCell(row: number, col: number, specifier: string) {
-    cellIdToFocus = tableCellId(row, col, specifier)
-    const target = document.getElementById(cellIdToFocus);
-    if (target) {
-        target.focus();
-        return target;
-    }
-}
-
-function addCellToRow(textContent: string, i: number, j: number, specifier: string, row: HTMLTableRowElement, action: (e: Event, s: string) => undefined) {
-    const cellId = tableCellId(i, j, specifier);
-    const cell = getOrCreateElementWithId('td', cellId, row);
-    cell.contentEditable = "plaintext-only";
-    cell.classList.add("data-cell");
-    cell.innerHTML = textContent + "<br/>";
-    cell.onblur = (e) => {
-        action(e, cell.textContent);
-        redraw();
-    }
-    const moveDown = () => { focusTableCell(i+1, j, specifier); }
-    const moveUp = () => { focusTableCell(i-1, j, specifier); }
-    const moveLeft = () => {
-        if (specifier == 'uncertainty')
-            focusTableCell(i, j, 'variable');
-        else if (j == 0)
-            focusTableCell(i-1, data.variables.length-1, 'uncertainty');
-        else
-            focusTableCell(i, j-1, 'uncertainty');
-    }
-    const moveRight = () => {
-        if (specifier == 'variable') {
-            focusTableCell(i, j, 'uncertainty');
-        }
-        else if (j == data.variables.length-1) {
-            focusTableCell(i+1, 0, 'variable');
-        }
-        else {
-            focusTableCell(i, j+1, 'variable');
-        }
-    }
-    cell.onfocus = (e) => {
-        inputHappendInFocusedCell = false;
-        storedFocusesCellValue = cell.innerText;
-        var sel, range;
-        window.setTimeout(function() {
-        if (window.getSelection && document.createRange) {
-            range = document.createRange();
-            range.selectNodeContents(cell);
-            sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-        } else if ((<any> document.body).createTextRange) {
-            range = (<any> document.body).createTextRange();
-            range.moveToElementText(cell);
-            range.select();
-        }}, 1);
-    }
-    cell.onkeyup = (e) => { e.stopPropagation(); }
-    cell.onkeydown = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            e.stopPropagation();
-            if (!inputHappendInFocusedCell)
-                cell.innerText = storedFocusesCellValue;
-            moveDown();
-            return;
-        }
-        if (e.key === 'ArrowDown') {
-            e.stopPropagation();
-            if (!inputHappendInFocusedCell)
-                cell.innerText = storedFocusesCellValue;
-            moveDown();
-            return;
-        }
-        if (e.key === 'ArrowUp') {
-            e.stopPropagation();
-            if (!inputHappendInFocusedCell)
-                cell.innerText = storedFocusesCellValue;
-            moveUp();
-            return;
-        }
-        inputHappendInFocusedCell = true;
-        if (e.key === 'ArrowRight') {
-            let _range = document.getSelection().getRangeAt(0)
-            let range = _range.cloneRange()
-            range.selectNodeContents(cell)
-            range.setEnd(_range.endContainer, _range.endOffset)
-            const carretPosition = range.toString().length;
-            if (carretPosition == cell.textContent.length) {
-                moveRight();
-            }
-            return;
-        }
-        if (e.key === 'ArrowLeft') {
-            let _range = document.getSelection().getRangeAt(0)
-            let range = _range.cloneRange()
-            range.selectNodeContents(cell)
-            range.setEnd(_range.endContainer, _range.endOffset)
-            const carretPosition = range.toString().length;
-            if (carretPosition == 0) {
-                moveLeft();
-            }
-            return;
-        }
-    }
-}
 
 function keep_digits(n: number, x: number, other?: number) {
     if (x == 0)
@@ -179,7 +61,7 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     let S11 = 0, Sx2 = 0, Sy2 = 0, Sxy = 0, Sx1 = 0, Sy1 = 0;  // ... a, b, ua, ub
     let xacc = 0, yacc = 0, SDxy = 0, SDx2 = 0, SDy2 = 0;  // ... r
     for (let i = 0; i < x.length; i++) {
-        const w = u[i] == 0 ? Number.MIN_VALUE : 1 / Math.pow(u[i], 2);
+        const w = u[i] == 0 ? Number.MAX_VALUE : 1 / Math.pow(u[i], 2);
         S11 += w;
         Sx1 += w * x[i];
         Sy1 += w * y[i];
@@ -203,7 +85,7 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     const sigma_a = Math.sqrt(Sx2 / Delta) * (use_u ? 1 : sigma_stat);
     // r
     for (let i = 0; i < x.length; i++) {
-        const w = u[i] == 0 ? Number.MIN_VALUE : 1 / Math.pow(u[i], 2);
+        const w = u[i] == 0 ? Number.MAX_VALUE : 1 / Math.pow(u[i], 2);
         SDxy += w * (x[i] - xacc/S11) * (y[i] - yacc/S11) / S11;
         SDx2 += w * Math.pow(x[i] - xacc/S11, 2) / S11;
         SDy2 += w * Math.pow(y[i] - yacc/S11, 2) / S11;
@@ -221,136 +103,279 @@ function regress(x: number[], y: number[], uy: number[]): RegressionResult {
     }
 }
 
+function getElementByIdOrCreate(tagName: string, parent: HTMLElement, id: string) {
+    const element = document.getElementById(`${id}`);
+    if (element)
+        return element;
+    const created = document.createElement(tagName);
+    created.id = id;
+    parent.appendChild(created);
+    return created;
+}
 
-function redraw(): void {
+type userNumber = string;
 
-    const modal = document.getElementById("modal");
-    modal.onclick = (e) => { if (e.target == modal) modal.classList.remove("modal-visible"); };
+interface DomainData {
+    arrays: { name: string, values: userNumber[] }[],
+    formulas: { name: string, formula: string }[],
+    selectedForChart: [number, number, number, number],
+}
 
-    const table = document.getElementById('data-table');
+class OutputData {
+    inputArrays: { name: string, values: { v: userNumber, isInvalid: boolean }[] }[] = [];
+    computedArrays: { name: string, values: { v: userNumber, isInvalid: boolean }[] }[] = [];
+}
 
-    const row = <HTMLTableRowElement> getOrCreateElementWithId('tr', 'header-row', table);
-    const settingsRow = <HTMLTableRowElement> getOrCreateElementWithId('tr', 'settings-row', table);
-    for (let j = 0; j < data.variables.length; j++) {
-        const i = -1;
-        addCellToRow(data.variables[j], i, j, 'variable', row, (e, s) => {
-            data.variables[j] = s;
-        });
-        addCellToRow('u(' + data.variables[j] + ')', i, j, 'uncertainty', row, () => {});
+const exampleDomainData: DomainData = {
+    arrays: [
+        { name: "X", values: ["0", "2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22"] },
+        { name: "Y", values: ["14.79", "33.52", "36.50", "51.88", "63.11", "66.94", "74.58", "92.46", "89.50", "109.29", "117.40", "118.37"] }],
+    formulas: [{ name: "u(X)", formula: "sin(X)" }, { name: "u(Y)", formula: "0.1*Y"}],
+    selectedForChart: [0, 2, 1, 3],
+}    
 
-        const settingsCell = <HTMLTableCellElement> getOrCreateElementWithId('td', tableCellId(i, j, 'settings'), settingsRow);
-        settingsCell.colSpan = 2;
-        settingsCell.onclick = () => {
-            const modalTitle = document.getElementById("modal-title");
-            modalTitle.textContent = "Paramètres de " + data.variables[j];
-            const modalContent = document.getElementById("modal-content");
-            modalContent.innerHTML = `
-            <fieldset>
-                <legend>Incertitudes</legend>
-                <input type="checkbox" id="uncertainty-` + j + `-display" ` + (data.show_uncertainties[j] ? `checked` : ``) + `/><label for="uncertainty-` + j + `-display">Afficher</label>
-                <input type="checkbox" id="uncertainty-` + j + `-use" ` + (data.use_uncertainties[j] ? `checked` : ``) + `/><label for="uncertainty-` + j + `-use">Utiliser</label>
-                <br>
-                <label for="uncertainty-`+ j + `-formula">Expression :</label><input type="text" id="uncertainty-`+ j + `-formula" value="` + data.uncertainty_forumlas[j] + `"/>
-            </fieldset>
-            `;
-            document.getElementById("modal").classList.add("modal-visible");
-            document.getElementById("uncertainty-" + j + "-display").onclick = () => {
-                data.show_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-display")).checked;
-                redraw();
+function processDomain(input: DomainData) : OutputData {
+    let finishedArrays: { name: string, values: { v: userNumber, isInvalid: boolean }[] }[] = [];
+    let output: OutputData = new OutputData();
+    const dataLength = Math.max(...input.arrays.map((a) => a.values.length));
+    input.arrays.forEach((variable, i) => {
+        const values: { v: userNumber, isInvalid: boolean }[] = [];
+        const array = { name: variable.name, values: values };
+        output.inputArrays.push(array);
+        variable.values.forEach((value, j) => {
+            array.values.push({
+                v: value,
+                isInvalid: (value == undefined) || (value.length == 0) || !Number.isFinite(Number(value))
+            })
+        })
+        for (let j = variable.values.length; j < dataLength; j++) {
+            array.values.push({
+                v: "",
+                isInvalid: true,
+            })
+        }
+        finishedArrays.push(array);
+    })
+    finishedArrays = finishedArrays.sort((a, b) => a.name.length - b.name.length).reverse();
+    console.log(finishedArrays);
+    exampleDomainData.formulas.forEach((formula, i) => {
+        const values: { v: userNumber, isInvalid: boolean }[] = [];
+        const array = { name: formula.name, values: values };
+        for (let row = 0; row < dataLength; row++) {
+            let cellExpression = formula.formula;
+            finishedArrays.forEach((array) => {
+                cellExpression = cellExpression.replaceAll(array.name, Number(array.values[row].v).toString());
+            })
+            let value: number | undefined;
+            try {
+                value = mexp.postfixEval(mexp.toPostfix(mexp.lex(cellExpression)));
+            } catch (error) {
+                value = undefined;
             }
-            document.getElementById("uncertainty-" + j + "-use").onclick = () => {
-                data.use_uncertainties[j] = (<HTMLFormElement> document.getElementById("uncertainty-" + j + "-use")).checked;
-                redraw();
-            }
-            document.getElementById("uncertainty-" + j + "-formula").onblur = () => {
-                data.uncertainty_forumlas[j] = (<HTMLInputElement> document.getElementById("uncertainty-" + j + "-formula")).value.trim();
-                redraw();
-            }
+            values.push({ v: value != undefined ? value.toString() : "#ERR", isInvalid: value == undefined });
+        }
+        output.computedArrays.push(array);
+        finishedArrays.push(array);
+    })
+    return output;
+}
+
+function makeEditableStringCell(key: string, column: number) {
+    const inputField = <HTMLInputElement> document.getElementById("input-table-field")!;
+    inputField.blur();
+    const cell = <HTMLTableCellElement> document.getElementById(`${key}-header-row-var-${column}`);
+    if (!cell) return false;
+    cell.classList.add("selected");
+    inputField.value = cell.textContent;
+    inputField.focus();
+    inputField.setSelectionRange(0, inputField.value.length);
+    inputField.onblur = () => {
+        cell.classList.remove("selected");
+        inputField.value = "";
+        inputField.onblur = null;
+    }
+    function validate() {
+        exampleDomainData.arrays[column].name = inputField.value.trim();
+        draw();
+    }
+    inputField.onkeydown = (e) =>{
+        if ((e.key === "Enter" || e.key === "Tab")) {
+            e.preventDefault();
+            validate();
+            inputField.blur();
+            return;
         }
     }
+}
 
-    for (let i = 0; i < data.values.length; i++) {
-        const row = <HTMLTableRowElement> getOrCreateElementWithId('tr', 'row-' + i, table);
-        row.classList.add('data-row');
-        for (let j = 0; j < data.variables.length; j++) {
-            addCellToRow(data.values[i][j], i, j, 'variable', row, (e, s) => {
-                data.values[i][j] = s;
-            });
-            if (data.uncertainty_forumlas[j].length == 0)
-                addCellToRow(data.uncertainties[i][j], i, j, 'uncertainty', row, (e, s) => {
-                    data.uncertainties[i][j] = s;
-                });
-            else
-                addCellToRow("=" + math.evaluate(data.uncertainty_forumlas[j].replace(data.variables[j], data.values[i][j])).toFixed(3), i, j, 'uncertainty', row, (e, s) => {
-                    data.uncertainties[i][j] = s;
-                });
+function makeEditableFormulaCell(key: string, column: number) {
+    const inputField = <HTMLInputElement> document.getElementById("input-table-field")!;
+    inputField.blur();
+    const cell = <HTMLTableCellElement> document.getElementById(`${key}-header-row-var-${column}`);
+    if (!cell) return false;
+    cell.classList.add("selected");
+    inputField.value = cell.textContent + " = " + exampleDomainData.formulas[column].formula;
+    inputField.focus();
+    inputField.setSelectionRange(0, inputField.value.length);
+    inputField.onblur = () => {
+        cell.classList.remove("selected");
+        inputField.value = "";
+        inputField.onblur = null;
+    }
+    function validate() {
+        const [n, f] = inputField.value.split("=");
+        exampleDomainData.formulas[column].name = n.trim();
+        exampleDomainData.formulas[column].formula = f.trim();
+        draw();
+    }
+    inputField.onkeydown = (e) =>{
+        if ((e.key === "Enter" || e.key === "Tab")) {
+            e.preventDefault();
+            validate();
+            inputField.blur();
+            return;
         }
     }
+}
 
-    const lastRow = <HTMLTableRowElement> getOrCreateElementWithId('tr', 'row-' + data.values.length, table);
-    for (let j = 0; j < data.variables.length; j++) {
-        const i = data.values.length;
-        addCellToRow('', i, j, 'variable', lastRow, (e, s) => {
-            if (!s) return;
-            if (!data.values[i])
-                data.values.push(Array(data.variables.length).fill(""));
-            if (!data.uncertainties[i])
-                data.uncertainties.push(Array(data.variables.length).fill(""));
-            data.values[i][j] = s;
-        });
-        addCellToRow('', i, j, 'uncertainty', lastRow, (e, s) => {
-            if (!s) return;
-            if (!data.values[i])
-                data.values.push(Array(data.variables.length).fill(""));
-            if (!data.uncertainties[i])
-                data.uncertainties.push(Array(data.variables.length).fill(""));
-            data.uncertainties[i][j] = s;
-        });
+function makeEditableNumberCell(key: string, column: number, row: number) {
+    const inputField = <HTMLInputElement> document.getElementById("input-table-field")!;
+    inputField.blur();
+    const cell = <HTMLTableCellElement> document.getElementById(`${key}-value-row-${row}-variable-${column}`);
+    if (!cell) return false;
+    cell.classList.add("selected");
+    inputField.value = cell.textContent;
+    inputField.focus();
+    inputField.setSelectionRange(0, inputField.value.length);
+    inputField.onblur = () => {
+        cell.classList.remove("selected");
+        inputField.value = "";
+        inputField.onkeyup = null;
+        inputField.onkeydown = null;
+        inputField.onblur = null;
     }
-
-    let valid_data: Data = {variables: [], values: [], uncertainties: [], uncertainty_forumlas: [], show_uncertainties: [], use_uncertainties: []};
-    valid_data.variables.push(...data.variables);
-    for (let i = 0; i < data.values.length; i++) {
-        const xy = data.values[i];
-        const uxy = [];
-        for (let j = 0; j < data.variables.length; j++) {
-            if (!data.use_uncertainties[j])
-                uxy.push("0");
-            else if (data.uncertainty_forumlas[j].length == 0)
-                uxy.push(data.uncertainties[i][j]);
-            else
-                uxy.push(math.evaluate(data.uncertainty_forumlas[j].replace(data.variables[j], xy[j])).toString());
-        }
-        let isBad = false;
-        for (let j = 0; j < data.variables.length; j++) {
-            const vIsBad = (xy[j] == undefined) || (xy[j].length == 0) || !Number.isFinite(Number(xy[j]));
-            const uIsBad = (uxy[j] == undefined) || (uxy[j].length == 0) || !Number.isFinite(Number(uxy[j]));
-            const vCell = document.getElementById("data-row-" + i + "-variable-" + j);
-            const uCell = document.getElementById("data-row-" + i + "-uncertainty-" + j);
-            if (vIsBad || uIsBad) {
-                vCell.classList.add("data-cell-nan");
-                uCell.classList.add("data-cell-nan");
-            } else {
-                vCell.classList.remove("data-cell-nan");
-                uCell.classList.remove("data-cell-nan");
+    function validate() {
+        if (cell.parentElement!.nextSibling == null && inputField.value.length == 0) return;
+        if (row >= exampleDomainData.arrays[column].values.length) {
+            for (let i = exampleDomainData.arrays[column].values.length; i < row; i++) {
+                exampleDomainData.arrays[column].values[i] = "";
             }
-            isBad = isBad || vIsBad || uIsBad;
         }
-        if (!isBad) {
-            valid_data.values.push(xy);
-            valid_data.uncertainties.push(uxy);
+        exampleDomainData.arrays[column].values[row] = inputField.value;
+        draw();
+    }
+    inputField.oninput = (e) => {
+        validate();
+    }
+    inputField.onkeydown = (e) => {
+        if ((e.key === "Enter" && !e.getModifierState("Shift")) || e.key === "ArrowDown") {
+            e.preventDefault();
+            validate();
+            inputField.blur();
+            const ok = makeEditableNumberCell(key, column, row + 1);
+            if (!ok) makeEditableNumberCell(key, column, row);
+            return;
+        }
+        if ((e.key === "Enter" && e.getModifierState("Shift")) || e.key === "ArrowUp") {
+            e.preventDefault();
+            validate();
+            inputField.blur();
+            const ok = makeEditableNumberCell(key, column, row - 1);
+            if (!ok) makeEditableNumberCell(key, column, row);
+            return;
+        }
+        if ((e.key === "Tab" && !e.getModifierState("Shift")) || (e.key === "ArrowRight" && e.getModifierState("Shift"))) {
+            e.preventDefault();
+            validate();
+            inputField.blur();
+            const ok = makeEditableNumberCell(key, column + 1, row);
+            if (!ok) makeEditableNumberCell(key, 0, row + 1);
+            return;
+        }
+        if ((e.key === "Tab" && e.getModifierState("Shift")) || (e.key === "ArrowLeft" && e.getModifierState("Shift"))) {
+            e.preventDefault();
+            validate();
+            inputField.blur();
+            let ok = makeEditableNumberCell(key, column - 1, row);
+            if (!ok) ok = makeEditableNumberCell(key, exampleDomainData.arrays.length - 1, row - 1);
+            if (!ok) ok = makeEditableNumberCell(key, 0, 0);
+            return;
         }
     }
-    console.log(valid_data.uncertainties)
+    return true;
+}
 
-    const regres = regress(
-        valid_data.values.map(xy => Number(xy[0])),
-        valid_data.values.map(xy => Number(xy[1])),
-        valid_data.uncertainties.map(uxy => Number(uxy[1]))
-    );
+function drawTables(data: OutputData) {
+    function drawTable(key: string, table: HTMLTableElement, arrays: { name: string, values: { v: userNumber, isInvalid: boolean }[] }[]) {
+        arrays.forEach((array, i) => {
+            const headerRow = <HTMLTableRowElement> getElementByIdOrCreate("tr", table, `${key}-header-row`);
+            const headerCell = <HTMLTableCellElement> getElementByIdOrCreate("th", headerRow, `${key}-header-row-var-${i}`);
+            headerCell.textContent = array.name;
+            if (key == "input-table") headerCell.onclick = () => { makeEditableStringCell(key, i) };
+            if (key == "computed-table") headerCell.onclick = () => { makeEditableFormulaCell(key, i) };
+            array.values.forEach((value, j) => {
+                const row = <HTMLTableRowElement> getElementByIdOrCreate("tr", table, `${key}-value-row-${j}`);
+                const cell = <HTMLTableCellElement> getElementByIdOrCreate("td", row, `${key}-value-row-${j}-variable-${i}`);
+                cell.textContent = value.v;
+                if (value.isInvalid)
+                    cell.classList.add("input-value-invalid");
+                else
+                    cell.classList.remove("input-value-invalid");
+                if (key == "input-table") cell.onclick = () => { makeEditableNumberCell(key, i, j) };
+            })
+            const lastRow = <HTMLTableRowElement> getElementByIdOrCreate("tr", table, `${key}-value-row-${array.values.length}`);
+            const lastCell = <HTMLTableCellElement> getElementByIdOrCreate("td", lastRow, `${key}-value-row-${array.values.length}-variable-${i}`);
+            if (key == "input-table") lastCell.onclick = () => { makeEditableNumberCell(key, i, array.values.length) };
+        })
+    }
+    const inputTable = <HTMLTableElement> document.getElementById("input-table")!;
+    drawTable("input-table", inputTable, data.inputArrays);
+    const computedTable = <HTMLTableElement> document.getElementById("computed-table");
+    drawTable("computed-table", computedTable, data.computedArrays);
+}
 
-    setClassContentTo("eqn-abscisse", data.variables[0]);
-    setClassContentTo("eqn-ordinate", data.variables[1]);
+function drawChart(data: OutputData) {
+
+    const abscisseSelector = <HTMLSelectElement> document.getElementById("abscisse-select")!;
+    const ordinateSelector = <HTMLSelectElement> document.getElementById("ordinate-select")!;
+    const uAbscisseSelector = <HTMLSelectElement> document.getElementById("u-abscisse-select")!;
+    const uOrdinateSelector = <HTMLSelectElement> document.getElementById("u-ordinate-select")!;
+    [...data.inputArrays, ...data.computedArrays].forEach((array, i) => {
+        const abscisseOption = <HTMLOptionElement> getElementByIdOrCreate("option", abscisseSelector, `abscisse-option-${i}`);
+        abscisseOption.textContent = array.name;
+        const ordinateOption = <HTMLOptionElement> getElementByIdOrCreate("option", ordinateSelector, `ordinate-option-${i}`);
+        ordinateOption.textContent = array.name;
+        const uAbscisseOption = <HTMLOptionElement> getElementByIdOrCreate("option", uAbscisseSelector, `u-abscisse-option-${i}`);
+        uAbscisseOption.textContent = array.name;
+        const uOrdinateOption = <HTMLOptionElement> getElementByIdOrCreate("option", uOrdinateSelector, `u-ordinate-option-${i}`);
+        uOrdinateOption.textContent = array.name;
+    })
+    abscisseSelector.onchange = (e) => { exampleDomainData.selectedForChart[0] = abscisseSelector.selectedIndex; draw() };
+    ordinateSelector.onchange = (e) => { exampleDomainData.selectedForChart[2] = ordinateSelector.selectedIndex; draw() };
+    uAbscisseSelector.onchange = (e) => { exampleDomainData.selectedForChart[1] = uAbscisseSelector.selectedIndex; draw() };
+    uOrdinateSelector.onchange = (e) => { exampleDomainData.selectedForChart[3] = uOrdinateSelector.selectedIndex; draw() };
+    const selectedAbscisse = exampleDomainData.selectedForChart[0];
+    const selectedOrdinate = exampleDomainData.selectedForChart[2];
+    const selectedUAbscisse = exampleDomainData.selectedForChart[1];
+    const selectedUOrdinate = exampleDomainData.selectedForChart[3];
+    abscisseSelector.selectedIndex = selectedAbscisse;
+    ordinateSelector.selectedIndex = selectedOrdinate;
+    uAbscisseSelector.selectedIndex = selectedUAbscisse;
+    uOrdinateSelector.selectedIndex = selectedUOrdinate;
+
+    const x = [...data.inputArrays, ...data.computedArrays][selectedAbscisse].name;
+    const y = [...data.inputArrays, ...data.computedArrays][selectedOrdinate].name;
+    const ux = [...data.inputArrays, ...data.computedArrays][selectedUAbscisse].name;
+    const uy = [...data.inputArrays, ...data.computedArrays][selectedUOrdinate].name;
+    const xArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == x);
+    const yArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == y);
+    const uxArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == ux);
+    const uyArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == uy);
+    if (xArray == undefined || yArray == undefined || uxArray == undefined || uyArray == undefined) return;
+
+    const regres = regress(xArray.values.map(x => Number(x.v)), yArray.values.map(y => Number(y.v)), uyArray.values.map(y => Number(y.v)));
+    setClassContentTo("eqn-abscisse", x);
+    setClassContentTo("eqn-ordinate", y);
     setClassContentTo("eqn-intercept-value", keep_digits(3, regres.sigma_a, regres.a));
     setClassContentTo("eqn-intercept-uncertainty", keep_digits(3, regres.sigma_a));
     setClassContentTo("eqn-slope-value", keep_digits(3, regres.sigma_b, regres.b));
@@ -361,26 +386,28 @@ function redraw(): void {
     setClassContentTo("eqn-chi2-value", keep_digits(3, regres.chi2));
     setClassContentTo("eqn-chi2red-value", keep_digits(3, regres.chi2red));
 
-    const chart = document.getElementById("chart");
+    const chart = document.getElementById("chart")!;
     var svgns = "http://www.w3.org/2000/svg";
     const svg = chart.getElementsByTagName("svg")[0];
+    svg.setAttribute("height", `${(svg.clientWidth - 50)/1.618 + 20}px`);
     svg.innerHTML = "";
     const w = svg.getBoundingClientRect().width;
     const h = svg.getBoundingClientRect().height;
-    const xmax0 = Math.max(...data.values.flatMap((v) => Number(v[0])).filter((n) => Number.isFinite(n)));
-    const xmin0 = Math.min(...data.values.flatMap((v) => Number(v[0])).filter((n) => Number.isFinite(n)));
-    console.log(xmin0);
-    const ymax0 = Math.max(...data.values.flatMap((v) => Number(v[1])).filter((n) => Number.isFinite(n)));
-    const ymin0 = Math.min(...data.values.flatMap((v) => Number(v[1])).filter((n) => Number.isFinite(n)));
-    const xmin = xmin0 - 0.05 * (xmax0 - xmin0);
-    console.log(xmin);
-    const xmax = xmax0 + 0.05 * (xmax0 - xmin0);
-    const ymin = ymin0 - 0.05 * (ymax0 - ymin0);
-    const ymax = ymax0 + 0.05 * (ymax0 - ymin0);
+    
+    const xValues = xArray.values.flatMap((v) => Number(v.v)).filter((n) => Number.isFinite(n));
+    const yValues = yArray.values.flatMap((v) => Number(v.v)).filter((n) => Number.isFinite(n));
+    const dataXmax = Math.max(...xValues);
+    const dataXmin = Math.min(...xValues);
+    const dataYmax = Math.max(...yValues);
+    const dataYmin = Math.min(...yValues);
+    const xmin = dataXmin - 0.05 * (dataXmax - dataXmin) - dataYmin/1000;
+    const xmax = dataXmax + 0.05 * (dataXmax - dataXmin) + dataXmax/1000;
+    const ymin = dataYmin - 0.05 * (dataYmax - dataYmin) - dataYmin/1000;
+    const ymax = dataYmax + 0.05 * (dataYmax - dataYmin) + dataYmax/1000;
 
     function dataToPixel(x: number, y: number): number[] {
         const X = (x - xmin) / (xmax - xmin) * (w - 55) + 50;
-        const Y = h - (y - ymin) / (ymax - ymin) * (h - 25) - 20;
+        const Y = h - (y - ymin) / (ymax - ymin) * (h - 30) - 25;
         return [X, Y];
     }
     function pixelToData(X: number, Y: number): number[] {
@@ -417,8 +444,8 @@ function redraw(): void {
         const barsize = pixelToData(3, 3);
         const uxsize = Math.max(ux, barsize[0]);
         const uysize = Math.max(uy, barsize[1]);
-        drawLine(x-uxsize, y, x+uxsize, y, c);
-        drawLine(x, y-uysize, x, y+uysize, c);
+        drawLine(Math.max(xmin, x-uxsize), y, Math.min(xmax, x+uxsize), y, c);
+        drawLine(x, Math.max(ymin, y-uysize), x, Math.min(ymax, y+uysize), c);
         if (uxsize == ux) {
             drawLine(x-uxsize, y-barsize[1], x-uxsize, y+barsize[1], c);
             drawLine(x+uxsize, y-barsize[1], x+uxsize, y+barsize[1], c);
@@ -429,16 +456,16 @@ function redraw(): void {
         }
     }
 
-    function drawXAxisPoint(x: number, y: number, c: string): void {
+    function drawXAxisTick(x: number, y: number, c: string): void {
         const barsize = pixelToData(6, 6)[1];
         drawLine(x, y-barsize, x, y, c);
-        drawText(x, y-barsize, x.toString(), 'middle', 'hanging');
+        drawText(x, y-barsize*2, x.toString(), 'middle', 'hanging');
     }
 
-    function drawYAxisPoint(x: number, y: number, c: string): void {
+    function drawYAxisTick(x: number, y: number, c: string): void {
         const barsize = pixelToData(6, 6)[0];
         drawLine(x-barsize, y, x, y, c);
-        drawText(x-barsize, y, y.toString(), 'end', 'central');
+        drawText(x-barsize*2, y, y.toString(), 'end', 'central');
     }
 
     function drawDot(x: number, y: number, s: number, c: string): void {
@@ -453,61 +480,62 @@ function redraw(): void {
         svg.appendChild(dot);
     }
 
-    const xRange = xmax - xmin;
-    let xsep = xRange / 5;
-    let xsepOptions = [1, 2, 5].map(x => x * Math.pow(10, Math.floor(Math.log10(xsep))));
-    xsep = xsepOptions.sort((a, b) => Math.abs(a - xsep) - Math.abs(b - xsep))[0];
-    for (let i = Math.floor(xmin / xsep); i <= Math.ceil(xmax / xsep); i++) {
-        const xline = i * xsep;
-        for (let j = 1; j < 5; j++) {
-            const xline2 = xline + j * xsep / 5;
-            if (xline2 <= xmin) continue;
-            drawLine(xline2, ymin, xline2, ymax, 'lightgray');
+    function divideRange(min: number, max: number, divisions: number) {
+        const range = max - min;
+        const exactDivider = range / divisions;
+        // get n such that exactDivider can be written as d.xyz * 10^n where d is a one-digit integer
+        const dividerDecimalExponent = Math.floor(Math.log10(exactDivider));
+        // then get 10^n
+        const dividerDecimalMagnitude = Math.pow(10, dividerDecimalExponent);
+        // prepare didiver options as 1, 2 or 5 multiplied by 10^n
+        const dividerOptions = [1, 2, 5].map(k => k * dividerDecimalMagnitude);
+        // find option closest to exactDivier
+        const divider = dividerOptions.sort((a, b) => Math.abs(a - exactDivider) - Math.abs(b - exactDivider))[0];
+        console.log(range, exactDivider, divider);
+        // compute tick values
+        const ticks: number[] = [];
+        const subticks: number[] = [];
+        for (let i = Math.floor(min / divider); i <= Math.ceil(max / divider); i++) {
+            const tick = i * divider;
+            if (min < tick && tick < max) ticks.push(tick);
+            for (let j = 1; j < divisions; j++) {
+                const subtick = tick + j * divider / divisions;
+                if (min < subtick && subtick < max) subticks.push(subtick)
+            }
         }
-        if (xline < xmin) continue;
-        drawLine(xline, ymin, xline, ymax, 'gray');
-        drawXAxisPoint(xline, ymin, 'black');
+        return [ticks, subticks];
     }
-    const yRange = ymax - ymin;
-    let ysep = yRange / 5;
-    let ysepOptions = [1, 2, 5].map(y => y * Math.pow(10, Math.floor(Math.log10(ysep))));
-    ysep = ysepOptions.sort((a, b) => Math.abs(a - ysep) - Math.abs(b - ysep))[0];
-    for (let i = Math.floor(xmin / xsep); i <= Math.ceil(ymax / ysep); i++) {
-        const yline = i * ysep;
-        for (let j = 1; j < 5; j++) {
-            const yline2 = yline + j * ysep / 5;
-            if (yline2 <= ymin) continue;
-            drawLine(xmin, yline2, xmax, yline2, 'lightgray');
-        }
-        if (yline < ymin) continue;
-        drawLine(xmin, yline, xmax, yline, 'gray');
-        drawYAxisPoint(xmin, yline, 'black');
-    }
+
+    const [xTicks, xSubticks] = divideRange(xmin, xmax, 5);
+    const [yTicks, ySubticks] = divideRange(ymin, ymax, 5);
+    // gridlines
+    xSubticks.forEach(x => drawLine(x, ymin, x, ymax, "lightgray"));
+    ySubticks.forEach(y => drawLine(xmin, y, xmax, y, "lightgray"));
+    xTicks.forEach(x => drawLine(x, ymin, x, ymax, "gray"));
+    yTicks.forEach(y => drawLine(xmin, y, xmax, y, "gray"));
+    // ticks
+    xTicks.forEach(x => drawXAxisTick(x, ymin, "black"));
+    yTicks.forEach(y => drawYAxisTick(xmin, y, "black"));
+    // axes
     drawLine(xmin, ymin, xmax, ymin, 'black');
     drawLine(xmin, ymin, xmin, ymax, 'black');
     drawLine(xmin, ymax, xmax, ymax, 'black');
     drawLine(xmax, ymin, xmax, ymax, 'black');
 
-    for (let i = 0; i < valid_data.values.length; i++) {
-        const x = Number(valid_data.values[i][0]);
-        const y = Number(valid_data.values[i][1]);
-        const ux = Number(valid_data.uncertainties[i][0]);
-        const uy = Number(valid_data.uncertainties[i][1]);
-        drawDataPoint(x, y, ux, uy, 'blue');
+    for (let j = 0; j < xArray.values.length; j++) {
+        const xValue = Number(xArray.values[j].v);
+        const yValue = Number(yArray.values[j].v);
+        const xInvalid = xArray.values[j].isInvalid;
+        const yInvalid = yArray.values[j].isInvalid;
+        if (!xInvalid && !yInvalid)
+            drawDataPoint(xValue, yValue, Number(uxArray.values[j].v), Number(uyArray.values[j].v), 'blue');
     }
     drawLine(xmin, regres.a + regres.b * xmin, xmax, regres.a + regres.b * xmax, 'blue');
-
-    // if (cellIdToFocus) {
-    //     console.log(cellIdToFocus);
-    //     const ce = document.getElementById(cellIdToFocus);
-    //     const range = document.createRange();
-    //     range.selectNodeContents(ce);
-    //     range.collapse();
-    //     const sel = document.getSelection();
-    //     sel.removeAllRanges();
-    //     sel.addRange(range);
-    //     cellIdToFocus = undefined;
-    // }
 }
 
-redraw();
+function draw() {
+    drawTables(processDomain(exampleDomainData));
+    drawChart(processDomain(exampleDomainData));
+}
+draw();
+window.onresize = () => { drawChart(processDomain(exampleDomainData))}
