@@ -373,7 +373,11 @@ function drawChart(data: OutputData) {
     const uyArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == uy);
     if (xArray == undefined || yArray == undefined || uxArray == undefined || uyArray == undefined) return;
 
-    const regres = regress(xArray.values.map(x => Number(x.v)), yArray.values.map(y => Number(y.v)), uyArray.values.map(y => Number(y.v)));
+    const anyInvalid: boolean[] = [];
+    for (let i = 0; i < xArray.values.length; i++) {
+        anyInvalid.push(xArray.values[i].isInvalid || yArray.values[i].isInvalid || uyArray.values[i].isInvalid);
+    }
+    const regres = regress(xArray.values.filter((_, i) => !anyInvalid[i]).map(x => Number(x.v)), yArray.values.filter((_, i) => !anyInvalid[i]).map(y => Number(y.v)), uyArray.values.filter((_, i) => !anyInvalid[i]).map(y => Number(y.v)));
     setClassContentTo("eqn-abscisse", x);
     setClassContentTo("eqn-ordinate", y);
     setClassContentTo("eqn-intercept-value", keep_digits(3, regres.sigma_a, regres.a));
