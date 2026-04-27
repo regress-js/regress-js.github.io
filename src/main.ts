@@ -1,14 +1,6 @@
 import Mexp from "math-expression-evaluator";
 const mexp = new Mexp();
 
-interface Data {
-    variables: string[],
-    values: string[][],
-    uncertainties: string[][],
-    uncertainty_forumlas: string[],
-    show_uncertainties: boolean[],
-    use_uncertainties: boolean[],
-}
 
 interface RegressionResult {
     b: number,
@@ -20,16 +12,6 @@ interface RegressionResult {
     chi2: number,
     chi2red: number,
 }
-
-let data: Data = {
-    variables: ["X", "Y"],
-    values: [["0", "14.79"], ["2", "33.52"], ["4", "36.50"], ["6", "51.88"], ["8", "63.11"], ["10", "66.94"], ["12", "74.58"], ["14", "92.46"], ["16", "89.50"], ["18", "109.29"], ["20", "117.40"], ["22", "118.37"]],
-    uncertainties: [["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"], ["0", "5"]],
-    uncertainty_forumlas: ["", ""],
-    show_uncertainties: [true, true],
-    use_uncertainties: [false, true],
-}
-
 
 function setClassContentTo(cls: string, value: string): void {
     const elements = document.getElementsByClassName(cls);
@@ -113,72 +95,56 @@ function getElementByIdOrCreate(tagName: string, parent: HTMLElement, id: string
     return created;
 }
 
-type userNumber = string;
+type UserInput = string;
+type ArrayValue = { v: UserInput, isInvalid: boolean };
+type Variable = { uuid: string, name: string, values: ArrayValue[] };
+type Formula = { uuid: string, name: string, formula: string };
 
-interface DomainData {
-    arrays: { name: string, values: userNumber[] }[],
-    formulas: { name: string, formula: string }[],
-    selectedForChart: [number, number, number, number],
-}
-
-class OutputData {
-    inputArrays: { name: string, values: { v: userNumber, isInvalid: boolean }[] }[] = [];
-    computedArrays: { name: string, values: { v: userNumber, isInvalid: boolean }[] }[] = [];
-}
-
-const exampleDomainData: DomainData = {
-    arrays: [
-        { name: "X", values: ["0", "2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22"] },
-        { name: "Y", values: ["14.79", "33.52", "36.50", "51.88", "63.11", "66.94", "74.58", "92.46", "89.50", "109.29", "117.40", "118.37"] }],
-    formulas: [{ name: "u(X)", formula: "sin(X)" }, { name: "u(Y)", formula: "0.1*Y"}],
-    selectedForChart: [0, 2, 1, 3],
-}    
-
-function processDomain(input: DomainData) : OutputData {
-    let finishedArrays: { name: string, values: { v: userNumber, isInvalid: boolean }[] }[] = [];
-    let output: OutputData = new OutputData();
-    const dataLength = Math.max(...input.arrays.map((a) => a.values.length));
-    input.arrays.forEach((variable, i) => {
-        const values: { v: userNumber, isInvalid: boolean }[] = [];
-        const array = { name: variable.name, values: values };
-        output.inputArrays.push(array);
-        variable.values.forEach((value, j) => {
-            array.values.push({
-                v: value,
-                isInvalid: (value == undefined) || (value.length == 0) || !Number.isFinite(Number(value))
-            })
-        })
-        for (let j = variable.values.length; j < dataLength; j++) {
-            array.values.push({
-                v: "",
-                isInvalid: true,
-            })
-        }
-        finishedArrays.push(array);
-    })
-    finishedArrays = finishedArrays.sort((a, b) => a.name.length - b.name.length).reverse();
-    console.log(finishedArrays);
-    exampleDomainData.formulas.forEach((formula, i) => {
-        const values: { v: userNumber, isInvalid: boolean }[] = [];
-        const array = { name: formula.name, values: values };
-        for (let row = 0; row < dataLength; row++) {
-            let cellExpression = formula.formula;
-            finishedArrays.forEach((array) => {
-                cellExpression = cellExpression.replaceAll(array.name, Number(array.values[row].v).toString());
-            })
-            let value: number | undefined;
-            try {
-                value = mexp.postfixEval(mexp.toPostfix(mexp.lex(cellExpression)));
-            } catch (error) {
-                value = undefined;
+class Domain {
+    inputVariables: Variable[] = [
+        { uuid: "a", name: "X", values: ["0", "2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22"].map(v => ({ v: v, isInvalid: false}))},
+        { uuid: "b", name: "Y", values: ["14.79", "33.52", "36.50", "51.88", "63.11", "66.94", "74.58", "92.46", "89.50", "109.29", "117.40", "118.37"].map(v => ({ v: v, isInvalid: false}))},
+    ];
+    inputFormulas: Formula[] = [
+        { uuid: "c", name: "u(X)", formula: "sin(X)" },
+        { uuid: "d", name: "u(Y)", formula: "0.1*Y"}
+    ];
+    formulasResults: Variable[] = [];
+    selectedVariables: { x: string, ux: string, y: string, uy: string } = { x: "a", ux: "c", y: "b", uy: "d" };
+    computeFormulas() : void {
+        const nRows = this.getNRows();
+        this.formulasResults = [];
+        this.inputFormulas.forEach(({ uuid, name, formula }: Formula) => {
+            const columnResults: Variable = { uuid: uuid, name: name, values: [] };
+            const inputVariables = Array.from(this.inputVariables).sort((a, b) => a.name.length - b.name.length).reverse();
+            for (let row = 0; row < nRows; row++) {
+                let rowFormula = formula;
+                [...inputVariables, ...this.formulasResults].forEach(v => {
+                    rowFormula = rowFormula.replaceAll(v.name, v.values[row].v);
+                })
+                let rowResult;
+                try {
+                    rowResult = mexp.postfixEval(mexp.toPostfix(mexp.lex(rowFormula))).toString();
+                } catch (error) {
+                    rowResult = undefined;
+                }
+                columnResults.values.push({ v: rowResult == undefined ? "#ERR" : rowResult.toString(), isInvalid: rowResult == undefined });
             }
-            values.push({ v: value != undefined ? value.toString() : "#ERR", isInvalid: value == undefined });
-        }
-        output.computedArrays.push(array);
-        finishedArrays.push(array);
-    })
-    return output;
+            this.formulasResults.push(columnResults);
+        })
+    };
+    getNRows() : number {
+        return Math.max(...this.inputVariables?.map((a) => a.values.length));
+    }
+    getVariables() : Variable[] {
+        return [...this.inputVariables, ...this.formulasResults];
+    }
+    getVariableByUUID(uuid: string) : Variable | undefined {
+        return this.getVariables().find(v => v.uuid == uuid);
+    }
 }
+
+const domain = new Domain();
 
 function makeEditableStringCell(key: string, column: number) {
     const inputField = <HTMLInputElement> document.getElementById("input-table-field")!;
@@ -195,7 +161,7 @@ function makeEditableStringCell(key: string, column: number) {
         inputField.onblur = null;
     }
     function validate() {
-        exampleDomainData.arrays[column].name = inputField.value.trim();
+        domain.inputVariables[column].name = inputField.value.trim();
         draw();
     }
     inputField.onkeydown = (e) =>{
@@ -214,7 +180,7 @@ function makeEditableFormulaCell(key: string, column: number) {
     const cell = <HTMLTableCellElement> document.getElementById(`${key}-header-row-var-${column}`);
     if (!cell) return false;
     cell.classList.add("selected");
-    inputField.value = cell.textContent + " = " + exampleDomainData.formulas[column].formula;
+    inputField.value = cell.textContent + " = " + domain.inputFormulas[column].formula;
     inputField.focus();
     inputField.setSelectionRange(0, inputField.value.length);
     inputField.onblur = () => {
@@ -224,8 +190,8 @@ function makeEditableFormulaCell(key: string, column: number) {
     }
     function validate() {
         const [n, f] = inputField.value.split("=");
-        exampleDomainData.formulas[column].name = n.trim();
-        exampleDomainData.formulas[column].formula = f.trim();
+        domain.inputFormulas[column].name = n.trim();
+        domain.inputFormulas[column].formula = f.trim();
         draw();
     }
     inputField.onkeydown = (e) =>{
@@ -256,12 +222,12 @@ function makeEditableNumberCell(key: string, column: number, row: number) {
     }
     function validate() {
         if (cell.parentElement!.nextSibling == null && inputField.value.length == 0) return;
-        if (row >= exampleDomainData.arrays[column].values.length) {
-            for (let i = exampleDomainData.arrays[column].values.length; i < row; i++) {
-                exampleDomainData.arrays[column].values[i] = "";
+        if (row >= domain.inputVariables[column].values.length) {
+            for (let i = domain.inputVariables[column].values.length; i < row; i++) {
+                domain.inputVariables[column].values[i].v = "";
             }
         }
-        exampleDomainData.arrays[column].values[row] = inputField.value;
+        domain.inputVariables[column].values[row].v = inputField.value;
         draw();
     }
     inputField.oninput = (e) => {
@@ -297,7 +263,7 @@ function makeEditableNumberCell(key: string, column: number, row: number) {
             validate();
             inputField.blur();
             let ok = makeEditableNumberCell(key, column - 1, row);
-            if (!ok) ok = makeEditableNumberCell(key, exampleDomainData.arrays.length - 1, row - 1);
+            if (!ok) ok = makeEditableNumberCell(key, domain.inputVariables.length - 1, row - 1);
             if (!ok) ok = makeEditableNumberCell(key, 0, 0);
             return;
         }
@@ -305,8 +271,8 @@ function makeEditableNumberCell(key: string, column: number, row: number) {
     return true;
 }
 
-function drawTables(data: OutputData) {
-    function drawTable(key: string, table: HTMLTableElement, arrays: { name: string, values: { v: userNumber, isInvalid: boolean }[] }[]) {
+function drawTables() {
+    function drawTable(key: string, table: HTMLTableElement, arrays: { name: string, values: { v: UserInput, isInvalid: boolean }[] }[]) {
         arrays.forEach((array, i) => {
             const headerRow = <HTMLTableRowElement> getElementByIdOrCreate("tr", table, `${key}-header-row`);
             const headerCell = <HTMLTableCellElement> getElementByIdOrCreate("th", headerRow, `${key}-header-row-var-${i}`);
@@ -329,57 +295,60 @@ function drawTables(data: OutputData) {
         })
     }
     const inputTable = <HTMLTableElement> document.getElementById("input-table")!;
-    drawTable("input-table", inputTable, data.inputArrays);
+    drawTable("input-table", inputTable, domain.inputVariables);
     const computedTable = <HTMLTableElement> document.getElementById("computed-table");
-    drawTable("computed-table", computedTable, data.computedArrays);
+    drawTable("computed-table", computedTable, domain.formulasResults);
 }
 
-function drawChart(data: OutputData) {
+class ChartData {
+    x: number[] = [];
+    y: number[] = [];
+    ux: number[] = [];
+    uy: number[] = [];
+}
 
-    const abscisseSelector = <HTMLSelectElement> document.getElementById("abscisse-select")!;
-    const ordinateSelector = <HTMLSelectElement> document.getElementById("ordinate-select")!;
-    const uAbscisseSelector = <HTMLSelectElement> document.getElementById("u-abscisse-select")!;
-    const uOrdinateSelector = <HTMLSelectElement> document.getElementById("u-ordinate-select")!;
-    [...data.inputArrays, ...data.computedArrays].forEach((array, i) => {
-        const abscisseOption = <HTMLOptionElement> getElementByIdOrCreate("option", abscisseSelector, `abscisse-option-${i}`);
-        abscisseOption.textContent = array.name;
-        const ordinateOption = <HTMLOptionElement> getElementByIdOrCreate("option", ordinateSelector, `ordinate-option-${i}`);
-        ordinateOption.textContent = array.name;
-        const uAbscisseOption = <HTMLOptionElement> getElementByIdOrCreate("option", uAbscisseSelector, `u-abscisse-option-${i}`);
-        uAbscisseOption.textContent = array.name;
-        const uOrdinateOption = <HTMLOptionElement> getElementByIdOrCreate("option", uOrdinateSelector, `u-ordinate-option-${i}`);
-        uOrdinateOption.textContent = array.name;
-    })
-    abscisseSelector.onchange = (e) => { exampleDomainData.selectedForChart[0] = abscisseSelector.selectedIndex; draw() };
-    ordinateSelector.onchange = (e) => { exampleDomainData.selectedForChart[2] = ordinateSelector.selectedIndex; draw() };
-    uAbscisseSelector.onchange = (e) => { exampleDomainData.selectedForChart[1] = uAbscisseSelector.selectedIndex; draw() };
-    uOrdinateSelector.onchange = (e) => { exampleDomainData.selectedForChart[3] = uOrdinateSelector.selectedIndex; draw() };
-    const selectedAbscisse = exampleDomainData.selectedForChart[0];
-    const selectedOrdinate = exampleDomainData.selectedForChart[2];
-    const selectedUAbscisse = exampleDomainData.selectedForChart[1];
-    const selectedUOrdinate = exampleDomainData.selectedForChart[3];
-    abscisseSelector.selectedIndex = selectedAbscisse;
-    ordinateSelector.selectedIndex = selectedOrdinate;
-    uAbscisseSelector.selectedIndex = selectedUAbscisse;
-    uOrdinateSelector.selectedIndex = selectedUOrdinate;
+function drawChart() {
+    const selectors: [string, (arg0: string) => void, () => string][] = [
+        ["abscisse-select", (v: string) => domain.selectedVariables.x = v, () => domain.selectedVariables.x],
+        ["ordinate-select", (v: string) => domain.selectedVariables.y = v, () => domain.selectedVariables.y],
+        ["u-abscisse-select", (v: string) => domain.selectedVariables.ux = v, () => domain.selectedVariables.ux],
+        ["u-ordinate-select", (v: string) => domain.selectedVariables.uy = v, () => domain.selectedVariables.uy]
+    ];
+    selectors.forEach(([id, set, get]) => {
+        const selector = <HTMLSelectElement> document.getElementById(id);
+        if (id[0] == "u") {
+            const nullOption = <HTMLOptionElement> getElementByIdOrCreate("option", selector, `${id}-option-null`);
+            nullOption.textContent = "";
+            nullOption.value = "null";
+        }
+        domain.getVariables().forEach((variable, i) => {
+            const option = <HTMLOptionElement> getElementByIdOrCreate("option", selector, `${id}-option-${i}`);
+            option.textContent = variable.name;
+            option.value = variable.uuid;
+        });
+        selector.onchange = (event) => { set(selector.value); drawChart(); };
+        selector.value = get();
+    });
 
-    const x = [...data.inputArrays, ...data.computedArrays][selectedAbscisse].name;
-    const y = [...data.inputArrays, ...data.computedArrays][selectedOrdinate].name;
-    const ux = [...data.inputArrays, ...data.computedArrays][selectedUAbscisse].name;
-    const uy = [...data.inputArrays, ...data.computedArrays][selectedUOrdinate].name;
-    const xArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == x);
-    const yArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == y);
-    const uxArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == ux);
-    const uyArray = [data.inputArrays, data.computedArrays].flatMap((array) => array).find((array) => array.name == uy);
-    if (xArray == undefined || yArray == undefined || uxArray == undefined || uyArray == undefined) return;
+    const x = domain.getVariableByUUID(domain.selectedVariables.x);
+    const y = domain.getVariableByUUID(domain.selectedVariables.y);
+    const ux = domain.selectedVariables.ux == "null" ? "null" : domain.getVariableByUUID(domain.selectedVariables.ux);
+    const uy = domain.selectedVariables.uy == "null" ? "null" : domain.getVariableByUUID(domain.selectedVariables.uy);
+    if (x == undefined || y == undefined || ux == undefined || uy == undefined) return;
 
-    const anyInvalid: boolean[] = [];
-    for (let i = 0; i < xArray.values.length; i++) {
-        anyInvalid.push(xArray.values[i].isInvalid || yArray.values[i].isInvalid || uyArray.values[i].isInvalid);
+    const chartData = new ChartData();
+    for (let row = 0; row < domain.getNRows(); row++) {
+        if (x.values[row].isInvalid || y.values[row].isInvalid || (ux != "null" && ux.values[row].isInvalid) || (uy != "null" && uy.values[row].isInvalid))
+            continue;
+        chartData.x.push(Number(x.values[row].v));
+        chartData.y.push(Number(y.values[row].v));
+        chartData.ux.push(ux == "null" ? 0 : Number(ux.values[row].v));
+        chartData.uy.push(uy == "null" ? 0 : Number(uy.values[row].v));
     }
-    const regres = regress(xArray.values.filter((_, i) => !anyInvalid[i]).map(x => Number(x.v)), yArray.values.filter((_, i) => !anyInvalid[i]).map(y => Number(y.v)), uyArray.values.filter((_, i) => !anyInvalid[i]).map(y => Number(y.v)));
-    setClassContentTo("eqn-abscisse", x);
-    setClassContentTo("eqn-ordinate", y);
+
+    const regres = regress(chartData.x, chartData.y, chartData.uy);
+    setClassContentTo("eqn-abscisse", domain.selectedVariables.x);
+    setClassContentTo("eqn-ordinate", domain.selectedVariables.y);
     setClassContentTo("eqn-intercept-value", keep_digits(3, regres.sigma_a, regres.a));
     setClassContentTo("eqn-intercept-uncertainty", keep_digits(3, regres.sigma_a));
     setClassContentTo("eqn-slope-value", keep_digits(3, regres.sigma_b, regres.b));
@@ -398,12 +367,10 @@ function drawChart(data: OutputData) {
     const w = svg.getBoundingClientRect().width;
     const h = svg.getBoundingClientRect().height;
     
-    const xValues = xArray.values.flatMap((v) => Number(v.v)).filter((n) => Number.isFinite(n));
-    const yValues = yArray.values.flatMap((v) => Number(v.v)).filter((n) => Number.isFinite(n));
-    const dataXmax = Math.max(...xValues);
-    const dataXmin = Math.min(...xValues);
-    const dataYmax = Math.max(...yValues);
-    const dataYmin = Math.min(...yValues);
+    const dataXmax = Math.max(...chartData.x);
+    const dataXmin = Math.min(...chartData.x);
+    const dataYmax = Math.max(...chartData.y);
+    const dataYmin = Math.min(...chartData.y);
     const xmin = dataXmin - 0.05 * (dataXmax - dataXmin) - dataYmin/1000;
     const xmax = dataXmax + 0.05 * (dataXmax - dataXmin) + dataXmax/1000;
     const ymin = dataYmin - 0.05 * (dataYmax - dataYmin) - dataYmin/1000;
@@ -495,7 +462,6 @@ function drawChart(data: OutputData) {
         const dividerOptions = [1, 2, 5].map(k => k * dividerDecimalMagnitude);
         // find option closest to exactDivier
         const divider = dividerOptions.sort((a, b) => Math.abs(a - exactDivider) - Math.abs(b - exactDivider))[0];
-        console.log(range, exactDivider, divider);
         // compute tick values
         const ticks: number[] = [];
         const subticks: number[] = [];
@@ -526,20 +492,21 @@ function drawChart(data: OutputData) {
     drawLine(xmin, ymax, xmax, ymax, 'black');
     drawLine(xmax, ymin, xmax, ymax, 'black');
 
-    for (let j = 0; j < xArray.values.length; j++) {
-        const xValue = Number(xArray.values[j].v);
-        const yValue = Number(yArray.values[j].v);
-        const xInvalid = xArray.values[j].isInvalid;
-        const yInvalid = yArray.values[j].isInvalid;
+    for (let j = 0; j < x.values.length; j++) {
+        const xValue = Number(x.values[j].v);
+        const yValue = Number(y.values[j].v);
+        const xInvalid = x.values[j].isInvalid;
+        const yInvalid = y.values[j].isInvalid;
         if (!xInvalid && !yInvalid)
-            drawDataPoint(xValue, yValue, Number(uxArray.values[j].v), Number(uyArray.values[j].v), 'blue');
+            drawDataPoint(xValue, yValue, Number(chartData.ux[j]), Number(chartData.uy[j]), 'blue');
     }
     drawLine(xmin, regres.a + regres.b * xmin, xmax, regres.a + regres.b * xmax, 'blue');
 }
 
 function draw() {
-    drawTables(processDomain(exampleDomainData));
-    drawChart(processDomain(exampleDomainData));
+    domain.computeFormulas();
+    drawTables();
+    drawChart();
 }
 draw();
-window.onresize = () => { drawChart(processDomain(exampleDomainData))}
+window.onresize = () => { drawChart(); }
