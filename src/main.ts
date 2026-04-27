@@ -1,17 +1,8 @@
 import Mexp from "math-expression-evaluator";
 const mexp = new Mexp();
 
-
-interface RegressionResult {
-    b: number,
-    a: number,
-    sigma_b: number,
-    sigma_a: number,
-    sigma_stat: number,
-    r: number,
-    chi2: number,
-    chi2red: number,
-}
+import { ChartData, updateChart } from "./chart";
+import { RegressionResult, regress } from "./regression";
 
 function setClassContentTo(cls: string, value: string): void {
     const elements = document.getElementsByClassName(cls);
@@ -34,56 +25,6 @@ function keep_digits(n: number, x: number, other?: number) {
     return (Math.round(x * power) / power).toFixed(Math.max(decimal_shift + n - 1, 0));
 }
 
-function regress(x: number[], y: number[], uy: number[]): RegressionResult {
-    /* Modèle y = a + b*x (https://bupdoc.udppc.asso.fr/consultation/article-bup.php?ID_fiche=20802) */
-    // Décider si les incertitudes sont rensignées, si non, prendre 1.
-    const use_u = uy.filter(it => it != 0).length > 0;
-    const u = use_u ? uy : Array(uy.length).fill(1);
-    // Calculer les sommes permettant d'évaluer...
-    let S11 = 0, Sx2 = 0, Sy2 = 0, Sxy = 0, Sx1 = 0, Sy1 = 0;  // ... a, b, ua, ub
-    let xacc = 0, yacc = 0, SDxy = 0, SDx2 = 0, SDy2 = 0;  // ... r
-    for (let i = 0; i < x.length; i++) {
-        const w = u[i] == 0 ? Number.MAX_VALUE : 1 / Math.pow(u[i], 2);
-        S11 += w;
-        Sx1 += w * x[i];
-        Sy1 += w * y[i];
-        Sxy += w * x[i] * y[i];
-        Sx2 += w * Math.pow(x[i], 2);
-        Sy2 += w * Math.pow(y[i], 2);
-        xacc += w * x[i];
-        yacc += w * y[i];
-    }
-    // a et b
-    const Delta = S11 * Sx2 - Math.pow(Sx1, 2);
-    const a = (Sx2 * Sy1 - Sx1 * Sxy) / Delta;
-    const b = (S11 * Sxy - Sx1 * Sy1) / Delta;
-    // sigma stat
-    let SDmod = 0;
-    for (let i = 0; i < x.length; i++) {
-        SDmod += Math.pow(y[i] - (a + b * x[i]), 2);
-    }
-    const sigma_stat = Math.sqrt(SDmod / (x.length - 2));
-    const sigma_b = Math.sqrt(S11 / Delta) * (use_u ? 1 : sigma_stat);
-    const sigma_a = Math.sqrt(Sx2 / Delta) * (use_u ? 1 : sigma_stat);
-    // r
-    for (let i = 0; i < x.length; i++) {
-        const w = u[i] == 0 ? Number.MAX_VALUE : 1 / Math.pow(u[i], 2);
-        SDxy += w * (x[i] - xacc/S11) * (y[i] - yacc/S11) / S11;
-        SDx2 += w * Math.pow(x[i] - xacc/S11, 2) / S11;
-        SDy2 += w * Math.pow(y[i] - yacc/S11, 2) / S11;
-    }
-    const r = SDxy / Math.sqrt(SDx2 * SDy2);
-    // chi 2
-    let chi2 = 0;
-    for (let i = 0; i < x.length; i++) {
-        chi2 += Math.pow((b*x[i]+a - y[i]) / u[i], 2)
-    }
-    const chi2red = chi2 / (x.length - 2);
-
-    return {
-        b: b, a: a, sigma_b: sigma_b, sigma_a: sigma_a, sigma_stat: sigma_stat, r: r, chi2: chi2, chi2red: chi2red,
-    }
-}
 
 function getElementByIdOrCreate(tagName: string, parent: HTMLElement, id: string) {
     const element = document.getElementById(`${id}`);
@@ -300,13 +241,6 @@ function drawTables() {
     drawTable("computed-table", computedTable, domain.formulasResults);
 }
 
-class ChartData {
-    x: number[] = [];
-    y: number[] = [];
-    ux: number[] = [];
-    uy: number[] = [];
-}
-
 function drawChart() {
     const selectors: [string, (arg0: string) => void, () => string][] = [
         ["abscisse-select", (v: string) => domain.selectedVariables.x = v, () => domain.selectedVariables.x],
@@ -360,147 +294,8 @@ function drawChart() {
     setClassContentTo("eqn-chi2red-value", keep_digits(3, regres.chi2red));
 
     const chart = document.getElementById("chart")!;
-    var svgns = "http://www.w3.org/2000/svg";
     const svg = chart.getElementsByTagName("svg")[0];
-    svg.setAttribute("height", `${(svg.clientWidth - 50)/1.618 + 20}px`);
-    svg.innerHTML = "";
-    const w = svg.getBoundingClientRect().width;
-    const h = svg.getBoundingClientRect().height;
-    
-    const dataXmax = Math.max(...chartData.x);
-    const dataXmin = Math.min(...chartData.x);
-    const dataYmax = Math.max(...chartData.y);
-    const dataYmin = Math.min(...chartData.y);
-    const xmin = dataXmin - 0.05 * (dataXmax - dataXmin) - dataYmin/1000;
-    const xmax = dataXmax + 0.05 * (dataXmax - dataXmin) + dataXmax/1000;
-    const ymin = dataYmin - 0.05 * (dataYmax - dataYmin) - dataYmin/1000;
-    const ymax = dataYmax + 0.05 * (dataYmax - dataYmin) + dataYmax/1000;
-
-    function dataToPixel(x: number, y: number): number[] {
-        const X = (x - xmin) / (xmax - xmin) * (w - 55) + 50;
-        const Y = h - (y - ymin) / (ymax - ymin) * (h - 30) - 25;
-        return [X, Y];
-    }
-    function pixelToData(X: number, Y: number): number[] {
-        const x = X / w * (xmax - xmin);
-        const y = Y / h * (ymax - ymin);
-        return [x, y];
-    }
-
-    function drawLine(x1: number, y1: number, x2: number, y2: number, c: string): void {
-        const [X1, Y1] = dataToPixel(x1, y1);
-        const [X2, Y2] = dataToPixel(x2, y2);
-        const line = document.createElementNS(svgns, 'line');
-        line.setAttributeNS(null, 'x1', X1.toString());
-        line.setAttributeNS(null, 'x2', X2.toString());
-        line.setAttributeNS(null, 'y1', Y1.toString());
-        line.setAttributeNS(null, 'y2', Y2.toString());
-        line.setAttributeNS(null, 'stroke', c);
-        svg.appendChild(line);
-    }
-
-    function drawText(x: number, y: number, value: string, align: string, valign: string): void {
-        const [X, Y] = dataToPixel(x, y);
-        const text = document.createElementNS(svgns, 'text');
-        text.setAttributeNS(null, 'x', X.toString());
-        text.setAttributeNS(null, 'y', Y.toString());
-        text.setAttributeNS(null, 'text-anchor', align);
-        text.setAttributeNS(null, 'dominant-baseline', valign);
-        text.textContent = value;
-        text.classList.add("xtick");
-        svg.appendChild(text);
-    }
-
-    function drawDataPoint(x: number, y: number, ux: number, uy: number, c: string): void {
-        const barsize = pixelToData(3, 3);
-        const uxsize = Math.max(ux, barsize[0]);
-        const uysize = Math.max(uy, barsize[1]);
-        drawLine(Math.max(xmin, x-uxsize), y, Math.min(xmax, x+uxsize), y, c);
-        drawLine(x, Math.max(ymin, y-uysize), x, Math.min(ymax, y+uysize), c);
-        if (uxsize == ux) {
-            drawLine(x-uxsize, y-barsize[1], x-uxsize, y+barsize[1], c);
-            drawLine(x+uxsize, y-barsize[1], x+uxsize, y+barsize[1], c);
-        }
-        if (uysize == uy) {
-            drawLine(x-barsize[0], y-uysize, x+barsize[0], y-uysize, c);
-            drawLine(x-barsize[0], y+uysize, x+barsize[0], y+uysize, c);
-        }
-    }
-
-    function drawXAxisTick(x: number, y: number, c: string): void {
-        const barsize = pixelToData(6, 6)[1];
-        drawLine(x, y-barsize, x, y, c);
-        drawText(x, y-barsize*2, x.toString(), 'middle', 'hanging');
-    }
-
-    function drawYAxisTick(x: number, y: number, c: string): void {
-        const barsize = pixelToData(6, 6)[0];
-        drawLine(x-barsize, y, x, y, c);
-        drawText(x-barsize*2, y, y.toString(), 'end', 'central');
-    }
-
-    function drawDot(x: number, y: number, s: number, c: string): void {
-        if (!Number.isFinite(x) || !Number.isFinite(y) || Number.isNaN(x) || Number.isNaN(y))
-            return;
-        const [X, Y] = dataToPixel(x, y);
-        const dot = document.createElementNS(svgns, 'circle');
-        dot.setAttributeNS(null, 'cx', X.toString());
-        dot.setAttributeNS(null, 'cy', Y.toString());
-        dot.setAttributeNS(null, 'r', s.toString());
-        dot.setAttributeNS(null, 'fill', c);
-        svg.appendChild(dot);
-    }
-
-    function divideRange(min: number, max: number, divisions: number) {
-        const range = max - min;
-        const exactDivider = range / divisions;
-        // get n such that exactDivider can be written as d.xyz * 10^n where d is a one-digit integer
-        const dividerDecimalExponent = Math.floor(Math.log10(exactDivider));
-        // then get 10^n
-        const dividerDecimalMagnitude = Math.pow(10, dividerDecimalExponent);
-        // prepare didiver options as 1, 2 or 5 multiplied by 10^n
-        const dividerOptions = [1, 2, 5].map(k => k * dividerDecimalMagnitude);
-        // find option closest to exactDivier
-        const divider = dividerOptions.sort((a, b) => Math.abs(a - exactDivider) - Math.abs(b - exactDivider))[0];
-        // compute tick values
-        const ticks: number[] = [];
-        const subticks: number[] = [];
-        for (let i = Math.floor(min / divider); i <= Math.ceil(max / divider); i++) {
-            const tick = i * divider;
-            if (min < tick && tick < max) ticks.push(tick);
-            for (let j = 1; j < divisions; j++) {
-                const subtick = tick + j * divider / divisions;
-                if (min < subtick && subtick < max) subticks.push(subtick)
-            }
-        }
-        return [ticks, subticks];
-    }
-
-    const [xTicks, xSubticks] = divideRange(xmin, xmax, 5);
-    const [yTicks, ySubticks] = divideRange(ymin, ymax, 5);
-    // gridlines
-    xSubticks.forEach(x => drawLine(x, ymin, x, ymax, "lightgray"));
-    ySubticks.forEach(y => drawLine(xmin, y, xmax, y, "lightgray"));
-    xTicks.forEach(x => drawLine(x, ymin, x, ymax, "gray"));
-    yTicks.forEach(y => drawLine(xmin, y, xmax, y, "gray"));
-    // ticks
-    xTicks.forEach(x => drawXAxisTick(x, ymin, "black"));
-    yTicks.forEach(y => drawYAxisTick(xmin, y, "black"));
-    // axes
-    drawLine(xmin, ymin, xmax, ymin, 'black');
-    drawLine(xmin, ymin, xmin, ymax, 'black');
-    drawLine(xmin, ymax, xmax, ymax, 'black');
-    drawLine(xmax, ymin, xmax, ymax, 'black');
-
-    for (let j = 0; j < x.values.length; j++) {
-        const xValue = Number(x.values[j].v);
-        const yValue = Number(y.values[j].v);
-        const xInvalid = x.values[j].isInvalid;
-        const yInvalid = y.values[j].isInvalid;
-        if (!xInvalid && !yInvalid)
-            drawDataPoint(xValue, yValue, Number(chartData.ux[j]), Number(chartData.uy[j]), 'blue');
-    }
-    drawLine(xmin, regres.a + regres.b * xmin, xmax, regres.a + regres.b * xmax, 'blue');
+    updateChart(svg, chartData, regres);
 }
 
 function draw() {
