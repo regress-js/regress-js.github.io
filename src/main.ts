@@ -281,8 +281,8 @@ function drawChart() {
     }
 
     const regres = regress(chartData.x, chartData.y, chartData.uy);
-    setClassContentTo("eqn-abscisse", domain.selectedVariables.x);
-    setClassContentTo("eqn-ordinate", domain.selectedVariables.y);
+    setClassContentTo("eqn-abscisse", domain.getVariableByUUID(domain.selectedVariables.x)!.name);
+    setClassContentTo("eqn-ordinate", domain.getVariableByUUID(domain.selectedVariables.y)!.name);
     setClassContentTo("eqn-intercept-value", keep_digits(3, regres.sigma_a, regres.a));
     setClassContentTo("eqn-intercept-uncertainty", keep_digits(3, regres.sigma_a));
     setClassContentTo("eqn-slope-value", keep_digits(3, regres.sigma_b, regres.b));
