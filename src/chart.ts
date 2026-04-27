@@ -1,4 +1,4 @@
-import { RegressionResult } from "./regression";
+import { regress, RegressionResult } from "./regression";
 
 var svgns = "http://www.w3.org/2000/svg";
 
@@ -170,5 +170,25 @@ export function updateChart(svg: SVGSVGElement, chartData: ChartData, regres: Re
         draw(svg, ...dataPoint(bounds, chartData.x[j], chartData.y[j], chartData.ux[j], chartData.uy[j], 'blue'));
     }
 
-    draw(svg, ...line(bounds, bounds.xmin, regres.a + regres.b * bounds.xmin, bounds.xmax, regres.a + regres.b * bounds.xmax, 'blue'));
+    let xStart = bounds.xmin;
+    let yStart = regres.a + regres.b * xStart;
+    if (yStart < bounds.ymin) {
+        yStart = bounds.ymin;
+        xStart = (yStart - regres.a) / regres.b;
+    } else if (yStart > bounds.ymax) {
+        yStart = bounds.ymax;
+        xStart = (yStart - regres.a) / regres.b;
+    }
+
+    let xEnd = bounds.xmax;
+    let yEnd = regres.a + regres.b * xEnd;
+    if (yEnd < bounds.ymin) {
+        yEnd = bounds.ymin;
+        xEnd = (yEnd - regres.a) / regres.b;
+    } else if (yEnd > bounds.ymax) {
+        yEnd = bounds.ymax;
+        xEnd = (yEnd - regres.a) / regres.b;
+    }
+
+    draw(svg, ...line(bounds, xStart, yStart, xEnd, yEnd, 'blue'));
 }
