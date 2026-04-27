@@ -18,7 +18,7 @@ export function regress(x: number[], y: number[], uy: number[]): RegressionResul
     let S11 = 0, Sx2 = 0, Sy2 = 0, Sxy = 0, Sx1 = 0, Sy1 = 0;  // ... a, b, ua, ub
     let xacc = 0, yacc = 0, SDxy = 0, SDx2 = 0, SDy2 = 0;  // ... r
     for (let i = 0; i < x.length; i++) {
-        const w = u[i] == 0 ? Number.MAX_VALUE : 1 / Math.pow(u[i], 2);
+        const w = u[i] == 0 ? 10000 / Math.pow(Math.max(...u), 2) : 1 / Math.pow(u[i], 2);
         S11 += w;
         Sx1 += w * x[i];
         Sy1 += w * y[i];
@@ -42,7 +42,7 @@ export function regress(x: number[], y: number[], uy: number[]): RegressionResul
     const sigma_a = Math.sqrt(Sx2 / Delta) * (use_u ? 1 : sigma_stat);
     // r
     for (let i = 0; i < x.length; i++) {
-        const w = u[i] == 0 ? Number.MAX_VALUE : 1 / Math.pow(u[i], 2);
+        const w = u[i] == 0 ? 10000 / Math.pow(Math.max(...u), 2) : 1 / Math.pow(u[i], 2);
         SDxy += w * (x[i] - xacc/S11) * (y[i] - yacc/S11) / S11;
         SDx2 += w * Math.pow(x[i] - xacc/S11, 2) / S11;
         SDy2 += w * Math.pow(y[i] - yacc/S11, 2) / S11;
