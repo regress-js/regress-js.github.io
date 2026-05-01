@@ -15,10 +15,10 @@ interface PlotBounds {
 }
 
 function getBounds(svg: SVGSVGElement, chartData: ChartData) : PlotBounds {
-    const dataXmax = Math.max(...chartData.x);
-    const dataXmin = Math.min(...chartData.x);
-    const dataYmax = Math.max(...chartData.y);
-    const dataYmin = Math.min(...chartData.y);
+    const dataXmax = Math.max(...chartData.x.map((x, i) => x + chartData.ux[i]));
+    const dataXmin = Math.min(...chartData.x.map((x, i) => x - chartData.ux[i]));
+    const dataYmax = Math.max(...chartData.y.map((y, i) => y + chartData.uy[i]));
+    const dataYmin = Math.min(...chartData.y.map((y, i) => y - chartData.uy[i]));
     return {
         xmin: dataXmin - 0.05 * (dataXmax - dataXmin) - dataYmin/1000,
         xmax: dataXmax + 0.05 * (dataXmax - dataXmin) + dataXmax/1000,
