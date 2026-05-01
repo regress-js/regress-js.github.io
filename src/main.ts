@@ -57,19 +57,15 @@ class Domain {
         this.formulasResults = [];
         this.inputFormulas.forEach(({ uuid, name, formula }: Formula) => {
             const columnResults: Variable = { uuid: uuid, name: name, values: [] };
-            const inputVariables = Array.from(this.inputVariables).sort((a, b) => a.name.length - b.name.length).reverse();
+            const tokens = this.getVariables().map(v => ({ "token": v.name, "type": 3, "value": v.name, "show": v.name, "precedence": 100 }));
             for (let row = 0; row < nRows; row++) {
-                let rowFormula = formula;
-                [...inputVariables, ...this.formulasResults].forEach(v => {
-                    rowFormula = rowFormula.replaceAll(v.name, v.values[row].v);
-                })
-                let rowResult;
+                const values: Record<string, number> = Object.assign({}, ...this.getVariables().map(v => ({ [v.name]: Number(v.values[row].v) }) ));
                 try {
-                    rowResult = mexp.postfixEval(mexp.toPostfix(mexp.lex(rowFormula))).toString();
+                    const rowResult = mexp.eval(formula, tokens, values);
+                    columnResults.values.push({ v: rowResult == undefined ? "#ERR" : rowResult.toString(), isInvalid: rowResult == undefined });
                 } catch (error) {
-                    rowResult = undefined;
+                    columnResults.values.push({ v: "#ERR", isInvalid: true });
                 }
-                columnResults.values.push({ v: rowResult == undefined ? "#ERR" : rowResult.toString(), isInvalid: rowResult == undefined });
             }
             this.formulasResults.push(columnResults);
         })
