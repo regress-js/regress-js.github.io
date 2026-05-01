@@ -51,6 +51,24 @@ main {
     }
 }
 
+.half:has(#input-table), .half:has(#computed-table) {
+    position: relative;
+    #column-adder {
+        position: absolute;
+        background-color: lightskyblue;
+        border: 2px dotted white;
+        font-weight: bolder;
+        color: lightskyblue;
+        cursor: pointer;
+        height: 0.6em;
+        width: 0.6em;
+        margin-top: 0.25em;
+        border-radius: 1.8em;
+        line-height: 1.5ex;
+        z-index: 10;
+    }
+}
+
 #chart {
     flex-grow: 1;
 }

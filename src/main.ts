@@ -1,6 +1,8 @@
 import Mexp from "math-expression-evaluator";
 const mexp = new Mexp();
 
+import { v4 as uuidv4 } from "uuid";
+
 import { ChartData, updateChart } from "./chart";
 import { RegressionResult, regress } from "./regression";
 
@@ -70,6 +72,17 @@ class Domain {
             this.formulasResults.push(columnResults);
         })
     };
+    newColumn(index: number, table: string) {
+        if (table == "input-table") {
+            this.inputVariables.splice(index, 0,
+                { uuid: uuidv4(), name: "n", values: this.inputVariables[0].values.map(() => ({ v: "", isInvalid: true})) }
+            )
+        } else {
+            this.inputFormulas.splice(index, 0,
+                { uuid: uuidv4(), name: "n", formula: "" }
+            )
+        }
+    }
     getNRows() : number {
         return Math.max(...this.inputVariables?.map((a) => a.values.length));
     }
@@ -229,7 +242,50 @@ function drawTables() {
             const lastRow = <HTMLTableRowElement> getElementByIdOrCreate("tr", table, `${key}-value-row-${array.values.length}`);
             const lastCell = <HTMLTableCellElement> getElementByIdOrCreate("td", lastRow, `${key}-value-row-${array.values.length}-variable-${i}`);
             if (key == "input-table") lastCell.onclick = () => { makeEditableNumberCell(key, i, array.values.length) };
-        })
+        });
+        const adder = getElementByIdOrCreate("div", table, "column-adder");
+        adder.parentElement!.removeChild(adder);
+        table.parentElement!.appendChild(adder);
+        [...table.rows].forEach((row) => { [...row.cells].forEach((cell, index) => {
+            cell.onmouseenter = () => {
+                cell.onmousemove = (ev) => {
+                    const mouseX = ev.pageX;
+                    const cellRect = cell.getBoundingClientRect();
+                    const tableRect = table.getBoundingClientRect();
+                    const wrapperRect = table.parentElement!.getBoundingClientRect();
+                    adder.style.top = tableRect.top + "px";
+                    if (mouseX < cellRect.left + cellRect.width/4) {
+                        adder.style.visibility = "visible";
+                        adder.style.left = (cellRect.left - wrapperRect.left - adder.getBoundingClientRect().width/2) + "px";
+                        adder.dataset.colIndex = index.toString();
+                        adder.dataset.table = key;
+                    } else if (mouseX > cellRect.left + 3*cellRect.width/4) {
+                        adder.style.visibility = "visible";
+                        adder.style.left = (cellRect.right - wrapperRect.left - adder.getBoundingClientRect().width/2) + "px";
+                        adder.dataset.colIndex = (index + 1).toString();
+                        adder.dataset.table = key;
+                    } else {
+                        adder.style.visibility = "hidden";
+                    }
+                }
+            }
+            cell.onmouseleave = () => {
+                cell.onmousemove = null;
+            };
+        })});
+        table.onmouseleave = (ev) => {
+            adder.style.visibility = "hidden";
+        };
+        adder.onmouseenter = () => {
+            adder.style.visibility = "visible";
+        }
+        adder.onclick = () => {
+            const newColIndex = adder.dataset.colIndex!;
+            const newColTable = adder.dataset.table!;
+            domain.newColumn(Number(newColIndex), newColTable);
+            domain.computeFormulas();
+            drawTables();
+        }
     }
     const inputTable = <HTMLTableElement> document.getElementById("input-table")!;
     drawTable("input-table", inputTable, domain.inputVariables);
