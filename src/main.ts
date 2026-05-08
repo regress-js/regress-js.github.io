@@ -152,6 +152,7 @@ function makeEditableFormulaCell(key: string, column: number) {
         domain.inputFormulas[column].formula = f.trim();
         draw();
     }
+    inputField.oninput = () => {}
     inputField.onkeydown = (e) =>{
         if ((e.key === "Enter" || e.key === "Tab")) {
             e.preventDefault();
