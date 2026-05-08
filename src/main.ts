@@ -353,6 +353,8 @@ function drawChart() {
     setClassContentTo("eqn-sigmastat-value", keep_digits(3, regres.sigma_stat));
     setClassContentTo("eqn-chi2-value", keep_digits(3, regres.chi2));
     setClassContentTo("eqn-chi2red-value", keep_digits(3, regres.chi2red));
+    setClassContentTo("eqn-inv-slope-value", keep_digits(3, 1/Math.pow(regres.b, 2) * regres.sigma_b, 1/regres.b));
+    setClassContentTo("eqn-inv-slope-uncertainty", keep_digits(3, 1/Math.pow(regres.b, 2) * regres.sigma_b));
 
     const chart = document.getElementById("chart")!;
     const svg = chart.getElementsByTagName("svg")[0];
