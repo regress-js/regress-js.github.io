@@ -22,7 +22,7 @@ function keep_digits(n: number, x: number, other?: number) {
             return (0).toString();
     const decimal_shift = Math.ceil(-Math.log10(Math.abs(x)));
     const power = Math.pow(10, decimal_shift + n - 1);
-    if (other)
+    if (other != undefined)
         return (Math.round(other * power) / power).toFixed(Math.max(decimal_shift + n - 1, 0));
     return (Math.round(x * power) / power).toFixed(Math.max(decimal_shift + n - 1, 0));
 }
