@@ -56,6 +56,14 @@ class Domain {
     selectedVariables: { x: string, ux: string, y: string, uy: string } = { x: "a", ux: "c", y: "b", uy: "d" };
     computeFormulas() : void {
         const nRows = this.getNRows();
+        this.inputVariables.forEach((variable) => {
+            for (let i = variable.values.length; i < nRows; i++) {
+                variable.values.push({ v: "", isInvalid: true });
+            }
+            variable.values.forEach((value) => {
+                value.isInvalid = isNaN(parseFloat(value.v));
+            })
+        })
         this.formulasResults = [];
         this.inputFormulas.forEach(({ uuid, name, formula }: Formula) => {
             const columnResults: Variable = { uuid: uuid, name: name, values: [] };
@@ -173,8 +181,8 @@ function makeEditableNumberCell(key: string, column: number, row: number) {
     function validate() {
         if (cell.parentElement!.nextSibling == null && inputField.value.length == 0) return;
         if (row >= domain.inputVariables[column].values.length) {
-            for (let i = domain.inputVariables[column].values.length; i < row; i++) {
-                domain.inputVariables[column].values[i].v = "";
+            for (let i = domain.inputVariables[column].values.length; i <= row; i++) {
+                domain.inputVariables[column].values[i] = { v: "", isInvalid: true };
             }
         }
         domain.inputVariables[column].values[row].v = inputField.value;
