@@ -45,10 +45,10 @@ function pixelToData(bounds: PlotBounds, X: number, Y: number): number[] {
     return [x, y];
 }
 
-function line(bounds: PlotBounds, x1: number, y1: number, x2: number, y2: number, c: string): Element[] {
+function line(bounds: PlotBounds, x1: number, y1: number, x2: number, y2: number, c: string): SVGLineElement[] {
     const [X1, Y1] = dataToPixel(bounds, x1, y1);
     const [X2, Y2] = dataToPixel(bounds, x2, y2);
-    const line = document.createElementNS(svgns, 'line');
+    const line = document.createElementNS(svgns, 'line') as SVGLineElement;
     line.setAttributeNS(null, 'x1', X1.toString());
     line.setAttributeNS(null, 'x2', X2.toString());
     line.setAttributeNS(null, 'y1', Y1.toString());
@@ -57,9 +57,9 @@ function line(bounds: PlotBounds, x1: number, y1: number, x2: number, y2: number
     return [line];
 }
 
-function drawText(bounds: PlotBounds, x: number, y: number, value: string, align: string, valign: string): Element[] {
+function drawText(bounds: PlotBounds, x: number, y: number, value: string, align: string, valign: string): SVGTextElement[] {
     const [X, Y] = dataToPixel(bounds, x, y);
-    const text = document.createElementNS(svgns, 'text');
+    const text: SVGTextElement = document.createElementNS(svgns, 'text') as SVGTextElement;
     text.setAttributeNS(null, 'x', X.toString());
     text.setAttributeNS(null, 'y', Y.toString());
     text.setAttributeNS(null, 'text-anchor', align);
@@ -69,8 +69,8 @@ function drawText(bounds: PlotBounds, x: number, y: number, value: string, align
     return [text]
 }
 
-function dataPoint(bounds: PlotBounds, x: number, y: number, ux: number, uy: number, c: string): Element[] {
-    const res: Element[] = [];
+function dataPoint(bounds: PlotBounds, x: number, y: number, ux: number, uy: number, c: string): SVGElement[] {
+    const res: SVGElement[] = [];
     const [xMinBarSize, yMinBarSize] = pixelToData(bounds, 3, 3);
     const xBarSize = Math.max(ux, xMinBarSize);
     const yBarSize = Math.max(uy, yMinBarSize);
@@ -91,27 +91,27 @@ function dataPoint(bounds: PlotBounds, x: number, y: number, ux: number, uy: num
     return res;
 }
 
-function xTick(bounds: PlotBounds, x: number, y: number, c: string): Element[] {
-    const res: Element[] = [];
+function xTick(bounds: PlotBounds, x: number, y: number, c: string): SVGElement[] {
+    const res: SVGElement[] = [];
     const barsize = pixelToData(bounds, 6, 6)[1];
     res.push(...line(bounds, x, y-barsize, x, y, c));
     res.push(...drawText(bounds, x, y-barsize*2, x.toString(), 'middle', 'hanging'));
     return res;
 }
 
-function yTick(bounds: PlotBounds, x: number, y: number, c: string): Element[] {
-    const res: Element[] = [];
+function yTick(bounds: PlotBounds, x: number, y: number, c: string): SVGElement[] {
+    const res: SVGElement[] = [];
     const barsize = pixelToData(bounds, 6, 6)[0];
     res.push(...line(bounds, x-barsize, y, x, y, c));
     res.push(...drawText(bounds, x-barsize*2, y, y.toString(), 'end', 'central'));
     return res;
 }
 
-function dot(bounds: PlotBounds, x: number, y: number, s: number, c: string): Element[] {
+function dot(bounds: PlotBounds, x: number, y: number, s: number, c: string): SVGCircleElement[] {
     if (!Number.isFinite(x) || !Number.isFinite(y) || Number.isNaN(x) || Number.isNaN(y))
         return [];
     const [X, Y] = dataToPixel(bounds, x, y);
-    const dot = document.createElementNS(svgns, 'circle');
+    const dot = document.createElementNS(svgns, 'circle') as SVGCircleElement;
     dot.setAttributeNS(null, 'cx', X.toString());
     dot.setAttributeNS(null, 'cy', Y.toString());
     dot.setAttributeNS(null, 'r', s.toString());
