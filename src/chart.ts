@@ -12,6 +12,8 @@ export class ChartData {
 interface PlotBounds {
     xmin: number, ymin: number, xmax: number, ymax: number,
     width: number, height: number,
+    leftPadding: number,
+    bottomPadding: number,
 }
 
 function getBounds(svg: SVGSVGElement, chartData: ChartData) : PlotBounds {
@@ -25,7 +27,9 @@ function getBounds(svg: SVGSVGElement, chartData: ChartData) : PlotBounds {
         ymin: dataYmin - 0.05 * (dataYmax - dataYmin) - dataYmin/1000,
         ymax: dataYmax + 0.05 * (dataYmax - dataYmin) + dataYmax/1000,
         width: svg.getBoundingClientRect().width,
-        height: svg.getBoundingClientRect().height
+        height: svg.getBoundingClientRect().height,
+        leftPadding: 60,
+        bottomPadding: 25,
     }
 }
 
@@ -34,8 +38,8 @@ function draw(svg: SVGSVGElement, ...elements: Element[]) {
 }
 
 function dataToPixel(bounds: PlotBounds, x: number, y: number): number[] {
-    const X = (x - bounds.xmin) / (bounds.xmax - bounds.xmin) * (bounds.width - 55) + 50;
-    const Y = bounds.height - (y - bounds.ymin) / (bounds.ymax - bounds.ymin) * (bounds.height - 30) - 25;
+    const X = (x - bounds.xmin) / (bounds.xmax - bounds.xmin) * (bounds.width - bounds.leftPadding - 15) + bounds.leftPadding;
+    const Y = bounds.height - (y - bounds.ymin) / (bounds.ymax - bounds.ymin) * (bounds.height - bounds.bottomPadding - 5) - bounds.bottomPadding;
     return [X, Y];
 }
 
