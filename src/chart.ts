@@ -99,11 +99,24 @@ function dataPoint(bounds: PlotBounds, x: number, y: number, ux: number, uy: num
     return res;
 }
 
+function keep_digits(n: number, x: number, other?: number) {
+    if (x == 0)
+        if (other)
+            return other.toString();
+        else
+            return (0).toString();
+    const decimal_shift = Math.ceil(-Math.log10(Math.abs(x)));
+    const power = Math.pow(10, decimal_shift + n - 1);
+    if (other != undefined)
+        return (Math.round(other * power) / power).toFixed(Math.max(decimal_shift + n - 1, 0));
+    return (Math.round(x * power) / power).toFixed(Math.max(decimal_shift + n - 1, 0));
+}
+
 function xTick(bounds: PlotBounds, x: number, y: number, c: string): SVGElement[] {
     const res: SVGElement[] = [];
     const barsize = pixelToData(bounds, 6, 6)[1];
     res.push(...line(bounds, x, y-barsize, x, y, c));
-    res.push(...drawText(bounds, x, y-barsize*2, x.toString(), 'middle', 'hanging'));
+    res.push(...drawText(bounds, x, y-barsize*2, keep_digits(3, bounds.xmax - bounds.xmin, x), 'middle', 'hanging'));
     return res;
 }
 
@@ -111,7 +124,7 @@ function yTick(bounds: PlotBounds, x: number, y: number, c: string): SVGElement[
     const res: SVGElement[] = [];
     const barsize = pixelToData(bounds, 6, 6)[0];
     res.push(...line(bounds, x-barsize, y, x, y, c));
-    res.push(...drawText(bounds, x-barsize*2, y, y.toString(), 'end', 'central'));
+    res.push(...drawText(bounds, x-barsize*2, y, keep_digits(3, bounds.ymax - bounds.ymin, y), 'end', 'central'));
     return res;
 }
 
