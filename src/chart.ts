@@ -37,6 +37,10 @@ function draw(svg: SVGSVGElement, ...elements: Element[]) {
     elements.forEach(e => svg.appendChild(e));
 }
 
+function remove(svg: SVGSVGElement, ...elements: Element[]) {
+    elements.forEach(e => svg.removeChild(e));
+}
+
 function dataToPixel(bounds: PlotBounds, x: number, y: number): number[] {
     const X = (x - bounds.xmin) / (bounds.xmax - bounds.xmin) * (bounds.width - bounds.leftPadding - 15) + bounds.leftPadding;
     const Y = bounds.height - (y - bounds.ymin) / (bounds.ymax - bounds.ymin) * (bounds.height - bounds.bottomPadding - 5) - bounds.bottomPadding;
@@ -156,6 +160,24 @@ export function updateChart(svg: SVGSVGElement, chartData: ChartData, regres: Re
 
     const [xTicks, xSubticks] = divideRange(bounds.xmin, bounds.xmax, 5);
     const [yTicks, ySubticks] = divideRange(bounds.ymin, bounds.ymax, 5);
+    // measure ticks
+    {
+        const yticks = yTicks.flatMap(y => yTick(bounds, bounds.xmin, y, "black"));
+        const tickXMax = Math.max(...yticks.map((el) => {
+            draw(svg, el);
+            const x = el.getBoundingClientRect().right;
+            remove(svg, el);
+            return x;
+        }));
+        const tickXMin = Math.min(...yticks.map((el) => {
+            draw(svg, el);
+            const x = el.getBoundingClientRect().left;
+            remove(svg, el);
+            return x;
+        }));
+        // update bounds
+        bounds.leftPadding = tickXMax - tickXMin + 5;
+    };
     // gridlines
     draw(svg, ...xSubticks.flatMap(x => line(bounds, x, bounds.ymin, x, bounds.ymax, "lightgray")));
     draw(svg, ...ySubticks.flatMap(y => line(bounds, bounds.xmin, y, bounds.xmax, y, "lightgray")));
